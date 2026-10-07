@@ -1,0 +1,18 @@
+diff --git a/generator/lines.cc b/generator/lines.cc
+index 76f65ad..adb607d 100644
+--- a/generator/lines.cc
++++ b/generator/lines.cc
+@@ -76,8 +76,11 @@ void LinesParser::next()
+       target_pos[target_count] = pos;
+     } else {
+       char toto[64];
+-      memcpy(toto, p, 63);
+-      toto[63] = 0;
++      // Bounded copy: the unbounded 63-byte memcpy reads past the end of the
++      // decompressed buffer, which faults on macOS for the sx120f data.
++      size_t tl = size_t(e - p) < 63 ? size_t(e - p) : 63;
++      memcpy(toto, p, tl);
++      toto[tl] = 0;
+       rnode_t trn = nr.lookup_r(p);
+       if(!trn) {
+ 	fprintf(stderr, "[%s]\n", toto);

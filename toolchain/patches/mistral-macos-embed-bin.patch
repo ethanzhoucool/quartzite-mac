@@ -1,0 +1,62 @@
+diff --git a/libmistral/CMakeLists.txt b/libmistral/CMakeLists.txt
+index 1360656..73c90d6 100644
+--- a/libmistral/CMakeLists.txt
++++ b/libmistral/CMakeLists.txt
+@@ -15,6 +15,29 @@ list(APPEND mistral_SOURCES
+     mistral-analogsim.cc
+ )
+ 
++
++# macOS: Apple ld has no "-r -b binary"; embed blobs with an assembler .incbin
++# stub that defines the same _binary_<name>_start/_end symbols.
++function(mistral_embed_bin OBJ BIN SYM)
++    if(APPLE)
++        set(ASM ${CMAKE_CURRENT_BINARY_DIR}/${OBJ}.S)
++        file(WRITE ${ASM} "\t.section __TEXT,__const\n\t.globl __binary_${SYM}_start\n\t.globl __binary_${SYM}_end\n\t.p2align 4\n__binary_${SYM}_start:\n\t.incbin \"${CMAKE_CURRENT_BINARY_DIR}/${BIN}\"\n__binary_${SYM}_end:\n\t.byte 0\n")
++        add_custom_command(
++           OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${OBJ}
++           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
++           COMMAND ${CMAKE_CXX_COMPILER} -c -x assembler ${ASM} -o ${OBJ}
++           DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${BIN}
++        )
++    else()
++        add_custom_command(
++           OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${OBJ}
++           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
++           COMMAND ld -r -b binary -o ${OBJ} ${BIN}
++           DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${BIN}
++        )
++    endif()
++endfunction()
++
+ set(TOOLS ${CMAKE_CURRENT_SOURCE_DIR}/../tools)
+ set(DATA ${CMAKE_CURRENT_SOURCE_DIR}/../data)
+ 
+@@ -68,12 +91,7 @@ foreach(die e50f gx25f gt75f gt150f gt300f sx50f sx120f)
+        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/../generator/generator ${DATA}/${die}-r.txt.xz ${DATA}/${die}-l.txt.xz ${DATA}/${die}-d.txt.xz ${DATA}/${die}-p2r.txt ${DATA}/${die}-p2p.txt ${DATA}/${die}-inv.txt
+     )
+ 
+-    add_custom_command(
+-       OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cvd-${die}-r.o
+-       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-       COMMAND ld -r -b binary -o cvd-${die}-r.o ${die}-r.bin
+-       DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${die}-r.bin
+-    )
++    mistral_embed_bin(cvd-${die}-r.o ${die}-r.bin ${die}_r_bin)
+ 
+     list(APPEND mistral_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/cvd-${die}-r.o)
+ 
+@@ -88,12 +106,7 @@ add_custom_command(
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/../generator/generator ${DATA}/driver-models.txt.xz
+ )
+ 
+-add_custom_command(
+-   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cv-global.o
+-   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-   COMMAND ld -r -b binary -o cv-global.o global.bin
+-   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/global.bin
+-)
++mistral_embed_bin(cv-global.o global.bin global_bin)
+ 
+ list(APPEND mistral_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/cv-global.o)
+ 

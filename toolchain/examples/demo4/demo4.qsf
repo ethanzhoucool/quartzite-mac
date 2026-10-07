@@ -1,0 +1,10 @@
+set_location_assignment PIN_AC30 -to w
+set_location_assignment PIN_AB28 -to x
+set_location_assignment PIN_Y27 -to y
+set_location_assignment PIN_AB30 -to z
+set_location_assignment PIN_AA24 -to f
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to w
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to x
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to y
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to z
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to f

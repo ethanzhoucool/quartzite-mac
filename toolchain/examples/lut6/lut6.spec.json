@@ -1,0 +1,58 @@
+{
+ "device": "5CSXFC6D6F31C6",
+ "comment": "lut6: asymmetric 6-input functions",
+ "inputs": {
+  "s9": "AA30",
+  "s8": "AC29",
+  "s7": "AD30",
+  "s6": "AC28",
+  "s5": "V25",
+  "s4": "W25",
+  "s3": "AC30",
+  "s2": "AB28",
+  "s1": "Y27",
+  "s0": "AB30"
+ },
+ "outputs": {
+  "led0": {
+   "pin": "AA24",
+   "expr": "[s0,s1,s2,s3][s9*2+s8]"
+  },
+  "led1": {
+   "pin": "AB23",
+   "expr": "(s0&s1)|((s2^s3)&s4)|(~s5&s0&~s2)"
+  },
+  "led2": {
+   "pin": "AC23",
+   "expr": "((s3 if s4 else s2) if s5 else (s1&~s0))"
+  },
+  "led3": {
+   "pin": "AD24",
+   "expr": "int(s2==s5 and s1==s4 and s0==s3)"
+  },
+  "led4": {
+   "pin": "AG25",
+   "expr": "(s6&s0)|(s7&s1)|(s8&~s2)"
+  },
+  "led5": {
+   "pin": "AF25",
+   "expr": "(s9^s7^s5)&(s0|~s3)&~s6"
+  },
+  "led6": {
+   "pin": "AE24",
+   "expr": "int((s3,s2,s1,s0)==(1,0,1,0))|(s9&~s4)"
+  },
+  "led7": {
+   "pin": "AF24",
+   "expr": "s9 if s0 else ((~s8) if s1 else (s7 if s2 else s6))"
+  },
+  "led8": {
+   "pin": "AB22",
+   "expr": "~(s1&s3)&(s5|s7)&(s9^s0)"
+  },
+  "led9": {
+   "pin": "AC22",
+   "expr": "(s2|s4)^(s6&s8)^s0"
+  }
+ }
+}

@@ -1,0 +1,24 @@
+name: SOF and toolchain checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sof-toolchain:
+    runs-on: ubuntu-22.04
+    container: swift:5.10-jammy
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run core and SOF regressions
+        run: |
+          swift build -c release
+          .build/release/Quartzite --selftest
+      - name: Test tool orchestration and the independent verifier
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq python3 >/dev/null
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s ci -p 'test_*.py'
+          bash -n toolchain/build_toolchain.sh toolchain/compile_rbf.sh
