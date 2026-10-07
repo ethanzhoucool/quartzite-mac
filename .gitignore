@@ -1,0 +1,9 @@
+.build/
+.swiftpm/
+Quartzite.app/
+*.xcodeproj
+.DS_Store
+ci-out/
+
+__pycache__/
+output_files/

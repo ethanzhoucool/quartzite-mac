@@ -1,0 +1,6 @@
+{
+  "device": "5CSXFC6D6F31C6",
+  "comment": "Example: f = sum m(2,3,6,7,9,13,14), w = MSB",
+  "inputs":  {"w": "AC30", "x": "AB28", "y": "Y27", "z": "AB30"},
+  "outputs": {"f": {"pin": "AA24", "expr": "~w&y | w&~y&z | x&y&~z"}}
+}

@@ -1,0 +1,105 @@
+name: quartus-check
+# Compiles the exported test designs with real Quartus Prime Lite 18.1 (the lab
+# runs 18.0). Run manually from the Actions tab; it downloads ~3 GB the first time.
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test the native editor
+        run: |
+          swift build
+          .build/debug/Quartzite --selftest
+      - name: Check the real-Quartus validation harness
+        run: python3 -m unittest discover -s ci -p 'test_*.py'
+
+  export:
+    runs-on: ubuntu-22.04
+    container: swift:5.10-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the command-line exporter
+        run: swift build -c release
+      - name: Self-test
+        run: .build/release/Quartzite --selftest
+      - name: Export test designs and saved example projects
+        run: |
+          .build/release/Quartzite --export-suite suite
+          for f in ci/designs/*.qzproj; do .build/release/Quartzite --export-project "$f" suite; done
+      - name: Independent .bdf connectivity check
+        run: |
+          apt-get update -qq && apt-get install -y -qq python3 >/dev/null
+          python3 ci/bdf_check.py suite/*
+      - uses: actions/upload-artifact@v4
+        with: { name: suite, path: suite }
+
+  quartus:
+    needs: export
+    if: ${{ github.event_name != 'pull_request' && vars.QUARTUS_ENABLED == 'true' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    env:
+      QDIR: /opt/intelFPGA_lite/18.1
+      # Altera now requires a sign-in to download, and the Internet Archive only kept the
+      # first 1 MB of these files. Put signed download links from altera.com in the
+      # QUARTUS_SETUP_URL / QUARTUS_CYCLONEV_URL repository secrets to enable this job.
+      # Whatever the source, the files must match the SHA-1 published on altera.com.
+      SETUP_URL: ${{ secrets.QUARTUS_SETUP_URL }}
+      SETUP_SHA1: 3cc0e856c0c203ed47d6eaca05a85c2f29b7bd01
+      CYV_URL: ${{ secrets.QUARTUS_CYCLONEV_URL }}
+      CYV_SHA1: be21e885ffd70321d926dbe269ee8c2ef7ad615e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: suite, path: suite }
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
+      - name: Cache Quartus installers
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ~/qdl
+          key: quartus-lite-18.1.0.625-cyclonev-v1
+      - name: Download and verify installers
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/qdl && cd ~/qdl
+          curl -L --fail --retry 8 --retry-delay 20 -o QuartusLiteSetup-18.1.0.625-linux.run "$SETUP_URL"
+          curl -L --fail --retry 8 --retry-delay 20 -o cyclonev-18.1.0.625.qdz "$CYV_URL"
+      - name: Verify SHA-1 against altera.com
+        run: |
+          cd ~/qdl
+          echo "$SETUP_SHA1  QuartusLiteSetup-18.1.0.625-linux.run" | sha1sum -c -
+          echo "$CYV_SHA1  cyclonev-18.1.0.625.qdz" | sha1sum -c -
+      - name: Install Quartus Prime Lite 18.1 (Cyclone V only)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq iverilog libncurses5 libtinfo5 libxft2 libxext6 libxrender1 libxtst6 libsm6 libfontconfig1 libglib2.0-0 >/dev/null
+          cd ~/qdl && chmod +x QuartusLiteSetup-18.1.0.625-linux.run
+          sudo ./QuartusLiteSetup-18.1.0.625-linux.run --mode unattended --unattendedmodeui none --accept_eula 1 \
+            --installdir "$QDIR" --disable-components quartus_help,modelsim_ase,modelsim_ae
+          sudo chown -R "$USER" "$QDIR"
+          echo "QUARTUS_ROOTDIR=$QDIR/quartus" >> "$GITHUB_ENV"
+          echo "$QDIR/quartus/bin" >> "$GITHUB_PATH"
+          du -sh "$QDIR"
+      - name: Quartus version
+        run: quartus_sh --version
+      - name: Compile and check every design
+        run: python3 ci/quartus_check.py suite/*
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quartus-results
+          path: |
+            suite/**/*.log
+            suite/**/output_files/*.rpt
+            suite/**/output_files/*.pin
+            suite/**/output_files/*.sof
+            suite/**/*.v
+            suite/**/*.vt

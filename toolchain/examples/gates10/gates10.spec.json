@@ -1,0 +1,58 @@
+{
+ "device": "5CSXFC6D6F31C6",
+ "comment": "gates10: SW9..SW0 -> LEDR9..LEDR0",
+ "inputs": {
+  "s9": "AA30",
+  "s8": "AC29",
+  "s7": "AD30",
+  "s6": "AC28",
+  "s5": "V25",
+  "s4": "W25",
+  "s3": "AC30",
+  "s2": "AB28",
+  "s1": "Y27",
+  "s0": "AB30"
+ },
+ "outputs": {
+  "led0": {
+   "pin": "AA24",
+   "expr": "s0&s1&s2&s3&s4&s5&s6&s7&s8&s9"
+  },
+  "led1": {
+   "pin": "AB23",
+   "expr": "s0|s1|s2|s3|s4|s5|s6|s7|s8|s9"
+  },
+  "led2": {
+   "pin": "AC23",
+   "expr": "s0^s1^s2^s3^s4^s5^s6^s7^s8^s9"
+  },
+  "led3": {
+   "pin": "AD24",
+   "expr": "~(s0&s1)"
+  },
+  "led4": {
+   "pin": "AG25",
+   "expr": "~(s2|s3)"
+  },
+  "led5": {
+   "pin": "AF25",
+   "expr": "~(s4^s5)"
+  },
+  "led6": {
+   "pin": "AE24",
+   "expr": "~s6"
+  },
+  "led7": {
+   "pin": "AF24",
+   "expr": "s7"
+  },
+  "led8": {
+   "pin": "AB22",
+   "expr": "(s9&s8)|(~s9&s7)"
+  },
+  "led9": {
+   "pin": "AC22",
+   "expr": "int((s3*8+s2*4+s1*2+s0) > (s7*8+s6*4+s5*2+s4))"
+  }
+ }
+}
