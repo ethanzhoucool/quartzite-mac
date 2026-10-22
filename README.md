@@ -26,6 +26,7 @@ proven and what isn't before relying on it:
 |---|---|
 | Schematic editor, simulation, Quartus-style compile report | Works; covered by self-tests. Some gestures (right-click menu, Hand Tool drag, scroll zoom) have had little hands-on use. |
 | Exported `.bdf` / `.qsf` / `.vwf` | Follow real Quartus files and pass an independent geometry and connectivity checker (`ci/bdf_check.py`). Opening a Quartzite export in real Quartus has **not** been confirmed yet. |
+| Multi-file designs, `.bsf` symbols, the 7447 | Block instances and `.bsf` files match files saved by Quartus Prime 18.0 token for token; covered by self-tests and `bdf_check.py`. Real Quartus has **not** compiled a Quartzite multi-file export yet, and the 7447's behaviour with LTN, RBIN or BIN low follows the TI datasheet, not Quartus. |
 | `.sof` container reader/writer | Byte-exact against real Quartus output on 26 public files; `.sof` to `.rbf` matches `quartus_cpf` on 16 pairs (`docs/SOF_FORMAT.md`). |
 | Experimental `.sof` generation | Works end to end with the open-source toolchain and is self-verified, but has **never** been loaded by Quartus Programmer or run on a board. DE10-Standard only. |
 
@@ -44,11 +45,41 @@ Keep compiling in Quartus for anything graded.
 | File | Purpose |
 |---|---|
 | `<project>.qpf`, `<project>.qsf` | Project and settings: Cyclone V 5CSXFC6D6F31C6, top-level entity, pin locations and each board pin's I/O standard |
-| `<project>.bdf` | The schematic in Quartus Block Editor format |
-| `Waveform.vwf` | Test vectors counting through every input combination |
+| `<entity>.bdf` | Each schematic in Quartus Block Editor format: the top-level entity and every file used under it |
+| `<entity>.bsf` | The block symbol of each exported file that has one, as Create Symbol Files writes it |
+| `Waveform.vwf` | Test vectors counting through every input combination of the top-level entity |
 | `<project>_pins.qsf` | Pin locations and I/O standards only, for Assignments > Import Assignments |
-| `<project>_backup.v` | The same circuit as structural Verilog, as a fallback |
+| `<project>_backup.v` | The same circuit as structural Verilog, as a fallback (one flat module for multi-file designs) |
 | `README_LAB.txt` | Step-by-step for the lab computer |
+
+Files that no block under the top-level entity uses are left out, and the export's
+message lists them. A sheet that could only be drawn with a wire touching another net
+is refused, with the file named.
+
+## Multi-file designs and library symbols
+
+A project holds several `.bdf` files, as in Quartus:
+
+- **Files.** `File > New...` > Block Diagram/Schematic File adds a file. Each file opens
+  in its own tab. The Project Navigator's Hierarchy view shows the instance tree under
+  the top-level entity (`FA:inst2`, `7447:inst5`). Its Files view lists every `.bdf`,
+  with Set as Top-Level Entity, Create Symbol Files, Rename and Remove File from Project.
+- **Symbols.** `File > Create/Update > Create Symbol Files for Current File` makes the
+  file's block symbol from its pins and updates the instances that use it.
+  `Edit > Update Symbol or Block...` updates the selected instances, every instance of
+  that symbol, or all instances.
+- **Insert Symbol.** The Symbol dialog lists the project's own blocks under
+  Project, the 7447 BCD-to-seven-segment decoder under `others > maxplus2`, and VCC and
+  GND under `primitives > other`. Blocks that would make a file contain itself are
+  refused, both in this dialog and when pasting.
+- **Navigation.** Double-clicking a block opens its file. Hierarchy Up (right-click
+  menu) returns to the parent with the same instance selected. Double-clicking a 7447
+  shows its function table.
+- **Compilation** flattens the hierarchy, so analysis, minimization, simulation and the
+  netlist cover the whole design. Messages about a block's contents name the file and
+  instance, and double-clicking one opens that file.
+- **Limits.** Blocks, the 7447, VCC and GND can't be rotated or flipped yet. Only the
+  top-level entity's pins get locations. A design can't use itself.
 
 ## Compiler
 
@@ -74,7 +105,9 @@ Details: `docs/ASSEMBLER_NOTES.md`, `docs/TOOLCHAIN_NOTES.md`.
 
 - `Quartzite --selftest` runs the netlist, routing, export, compiler, `.sof` and (when the
   toolchain is installed) hardware-flow checks.
-- `Quartzite --export-suite <dir>` exports the reference designs in `TestDesigns.swift`.
+- `Quartzite --export-suite <dir>` exports the reference designs in `TestDesigns.swift`,
+  including the multi-file `hier_fixture`, `addsub4` and `addsub4_display` and the 7447
+  designs.
 - `python3 ci/bdf_check.py <dir>/*` re-reads each exported `.bdf` independently (wire
   endpoints touching ports, same-name wires joined, as Quartus does) and simulates it
   against Quartzite's truth table. It also checks every primitive's drawing and ports,
@@ -84,7 +117,9 @@ Details: `docs/ASSEMBLER_NOTES.md`, `docs/TOOLCHAIN_NOTES.md`.
 - `bash ci/sof_check.sh` runs the `.sof` checks against sample files in `../sof-samples`
   (not included; see `docs/SOF_FORMAT.md` for the public sources).
 - `ci/quartus_check.py` compiles the exports with real Quartus Lite 18.1 in GitHub Actions
-  when installer links are provided (see `.github/workflows/quartus.yml`).
+  when installer links are provided (see `.github/workflows/quartus.yml`). For multi-file
+  designs and designs with a 7447 it skips the Verilog-conversion and waveform steps and
+  says why.
 
 ## License
 

@@ -194,6 +194,99 @@ tab, and once mid-run through the asynchronous pipeline. The live run reached
 Analyzer=succeeded, EDA Netlist Writer=succeeded`, ended with "Quartzite Full Compilation
 was successful. 0 errors, 0 warnings", and switched to the Compilation Report tab.
 
+## Hierarchy and library macros (branch `hierarchy`)
+
+### Model (`Design.swift`)
+- A `.qzproj` of format 2 is a `DesignProject`: the project name, the device, the
+  top-level entity and one `Project` per `.bdf` ("sheet"). A sheet's entity name is also
+  its file name. Format 1 files (one bare `Project`) and old autosaves are wrapped on load.
+  A file from a newer format is refused with a message.
+- Entity names must be valid identifiers, unique ignoring case (Windows file names), and
+  not reserved in Verilog, VHDL or AHDL. Renaming a sheet renames its symbol and every
+  block instance of it.
+- A component is a primitive, a `.block` (a sheet of the project, drawn with that sheet's
+  symbol), a `.macro` (a library symbol, so far only the 7447) or `.vcc` / `.gnd`. Each
+  takes its ports and drawing from its own symbol, so the canvas, router, connectivity and
+  writer need no special cases.
+
+### Symbols (`Symbols.swift`)
+- `SymbolDef` reads and writes Quartus' `(symbol ...)` text. `SymbolGenerator` makes the
+  symbol that Create Symbol Files for Current File makes in Quartus Prime 18.0: inputs on
+  the left and outputs on the right, each in sheet order top to bottom, sized from the
+  port names in Intel Clear 8 pt. The rules come from Quartus-made fixtures
+  (`ci/fixtures/quartus18/hier`): the generated `HA.bsf` and `BIGBLK.bsf` match them
+  token for token and byte for byte after the comments, and the parent instances match
+  `hiertop.bdf`.
+- Provisional, until more Quartus samples exist: the width of text not among the 12
+  measured strings (estimated per character), the gap between the longest input and
+  output names, and the body height above 2 rows of ports. They only change how a block
+  looks, and Quartzite writes its `.bdf` and `.bsf` consistently either way.
+- A `.bsf` is written with CRLF line ends, Quartus' warning comment and a short
+  provenance comment. Intel's copyright text is not copied.
+
+### VCC, GND and the 7447 (`Macros.swift`)
+- VCC comes from a `.bdf` that Quartus Prime 18.0 compiled. GND follows older
+  Quartus-saved files and is provisional.
+- The 7447 (`others > maxplus2`) is written with the symbol text Quartus Prime 18.0 puts
+  in a `.bdf`. Its function is a truth table over A, B, C, D, LTN, RBIN and BIN, with
+  active-low outputs OA ... OG and RBON. The 16 digits with the controls high follow the
+  TI datasheet's segment patterns (6 without its top bar, 9 without its tail). The control
+  combinations also follow the datasheet and are unconfirmed in Quartus: BIN = 0 blanks,
+  LTN = 0 lights every segment, RBIN = 0 blanks a 0, and RBON does not depend on BIN.
+- For compilation the 7447 becomes gates (`MacroSynth`): each output's ON-set minimized
+  exactly, one NOT per complemented input, AND and OR trees. Its inputs must be
+  connected. An open one is an error that suggests tying the control inputs to VCC.
+
+### Flattening (`Hierarchy.swift`)
+- `Flattener` expands every block and macro under the top-level entity into one sheet of
+  primitives. Nets are joined through block ports with union-find. Each flat net is named
+  after a top-level pin, then a top-level node name, then the shallowest inner name, then
+  `qz_n<k>`. Analysis, synthesis, simulation, the `.vo` netlist and the Verilog backup all
+  work on this flat sheet.
+- Flat components keep Quartus-style hierarchical names (`AddSub4:inst|FA:inst2|HA:inst|inst1`).
+  Each message is mapped back to the sheet and component the user drew, so
+  double-clicking it opens that file.
+- Errors: a block whose file is missing, a design that contains itself, an unknown
+  library symbol, a block port that is no longer a pin of its file (the message says to
+  run Create Symbol Files, then Update Symbol or Block), and an open 7447 input.
+- An unconnected block input is driven by the child pin's default value (VCC unless set
+  to GND), with a warning. What Quartus does here is not confirmed.
+- A top sheet without blocks or macros is used as it is, so single-file designs compile
+  exactly as before.
+
+### Compilation report and messages
+- Analysis & Synthesis prints `Found 1 design units, including 1 entities, in source file X.bdf`
+  for each file, then `Elaborating entity "FA" for hierarchy "AddSub4:inst|FA:inst1"` for
+  each instance, as Quartus does.
+- Source Files Read lists every `.bdf` and each library macro. Resource Utilization by
+  Entity has one row per instance with Full Hierarchy Name, Entity Name and Library Name
+  (`work` or `maxplus2`). LUTs are mapped after flattening, so Combinational ALUTs are
+  given for the top-level entity only. Schematic Gates counts each entity's own gates
+  and everything below it.
+
+### Export (`Exporters.swift`)
+- One `.bdf` for each file used under the top-level entity, top first, plus its `.bsf`
+  when it has a symbol. The `.qsf` has one `BDF_FILE` line per exported file. Files that
+  aren't used are left out (decision D4), and the export's message lists them.
+- `<project>_backup.v` and the `.vo` are flat: one module (decision D5).
+- `README_LAB.txt` lists the files and the steps for a multi-file project.
+- Export is refused when a file would need a wire through another net, naming that file.
+- `ci/bdf_check.py` flattens the exported hierarchy itself. It checks block symbols and
+  `.bsf` files against the generator rules, VCC, GND and the 7447 against Quartus'
+  symbol text, and the `.qsf` file list and top-level entity. It then simulates with its
+  own 7447 model, written separately from Quartzite's. `--bsf <file.bsf>...` checks
+  `.bsf` files on their own.
+- `ci/quartus_check.py` skips its Verilog-conversion and waveform steps for designs with
+  several `.bdf` files or a library macro, and prints why. `--convert_bdf_to_verilog`
+  translates only the top `.bdf`, so blocks and the 7447 would be left undefined.
+
+### Not confirmed in Quartus yet
+- Real Quartus has not compiled a Quartzite multi-file export yet, and no Quartus `.vo`
+  of one has been checked with `ci/vo_check.py`.
+- The 7447 control-input behaviour and the GND symbol text.
+- The symbol geometry rules marked provisional above.
+- Quartus' default for an unconnected block input.
+
 ## Known gaps
 
 - No .sof, no routing, no delays. Logic placement is logical (LAB n, ALM m), not a Quartus
