@@ -286,11 +286,43 @@ final class Store {
         simulation = nil
         compiled = nil
         exportedTo = nil
-        refreshRouting()
+        if inLiveEdit && routingDuration > liveRoutingBudget { scheduleRouting() } else { refreshRouting() }
         autosave()
     }
 
-    func refreshRouting() { routing = Routing(project: project, conn: Connectivity(project)) }
+    func refreshRouting() {
+        pendingRouting?.cancel()
+        pendingRouting = nil
+        let t0 = CFAbsoluteTimeGetCurrent()
+        routing = Routing(project: project, conn: Connectivity(project))
+        routingDuration = CFAbsoluteTimeGetCurrent() - t0
+    }
+
+    /// Routing a big sheet takes longer than a drag step (about 140 ms for a 58-symbol sheet
+    /// in a debug build). When the last routing took longer than this, drag steps reroute
+    /// only once the pointer rests for `liveRoutingDelay` or the drag ends.
+    var liveRoutingBudget: TimeInterval = 0.05
+    static let liveRoutingDelay: TimeInterval = 0.12
+    private var routingDuration: TimeInterval = 0
+    private var inLiveEdit = false
+    private var pendingRouting: Task<Void, Never>?
+
+    /// The routing still shows the sheet as it was before the last drag steps.
+    var routingIsBehind: Bool { pendingRouting != nil }
+
+    private func scheduleRouting() {
+        pendingRouting?.cancel()
+        pendingRouting = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(Store.liveRoutingDelay * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            self?.refreshRouting()
+        }
+    }
+
+    /// The end of a drag: reroutes the sheet if drag steps deferred it.
+    func finishLiveEdit() {
+        if routingIsBehind { refreshRouting() }
+    }
 
     func checkpoint() {
         undoStack.append((design, activeSheetID))
@@ -322,11 +354,15 @@ final class Store {
         mutateDesign { change(&$0.sheets[i]) }
     }
 
-    /// Live edits during a drag; call `checkpoint()` once before the drag starts.
+    /// Live edits during a drag; call `checkpoint()` once before the drag starts and
+    /// `finishLiveEdit()` when it ends.
     func liveMutate(_ change: (inout Project) -> Void) {
         var p = project
         change(&p)
+        guard p != project else { return }
+        inLiveEdit = true
         project = p
+        inLiveEdit = false
     }
 
     var canUndo: Bool { !undoStack.isEmpty }

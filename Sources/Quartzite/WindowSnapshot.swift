@@ -79,6 +79,7 @@ enum WindowSnapshot {
             window.close()
         }
         if (store.simulation?.rows.count ?? 0) > 64 { measureScrolling(store) }
+        measureEditing(store)
         // Dialogs of multi-file designs: Insert Symbol on the block's sheet, the macro's function table.
         if block != nil {
             ok = render(PropertySheetView(store: store, sheet: .symbolLibrary(at: .zero)).background(.background), "dialog_symbol", dir) && ok
@@ -163,6 +164,49 @@ enum WindowSnapshot {
                          times.reduce(0, +) / Double(max(1, times.count)), sorted[sorted.count / 2], sorted.last ?? 0))
         }
         window.close()
+    }
+
+    /// Times one drag step on the top sheet: the connectivity and routing alone, a live move
+    /// of a component that reroutes at once and one that defers the routing, and the autosave
+    /// written after each edit.
+    @MainActor
+    static func measureEditing(_ store: Store) {
+        guard let top = store.design.top?.id else { return }
+        store.openSheet(top)
+        guard let c = store.project.components.first(where: { !$0.kind.isPin }) ?? store.project.components.first else { return }
+        func time(_ body: (Int) -> Void) -> String {
+            var times: [Double] = []
+            for n in 0..<40 {
+                let t0 = CFAbsoluteTimeGetCurrent()
+                body(n)
+                times.append((CFAbsoluteTimeGetCurrent() - t0) * 1000)
+            }
+            let sorted = times.sorted()
+            return String(format: "mean %.1f ms, median %.1f ms, max %.1f ms",
+                          times.reduce(0, +) / Double(times.count), sorted[sorted.count / 2], sorted.last ?? 0)
+        }
+        let p = store.project
+        print("edit timing, \(p.components.count) components and \(p.wires.count) wires on \(p.entityName).bdf:")
+        print("  connectivity: " + time { _ in _ = Connectivity(p) })
+        print("  connectivity and routing: " + time { _ in store.refreshRouting() })
+        func move(_ n: Int) {
+            store.liveMutate { p in
+                if let i = p.index(of: c.id) { p.components[i].x = c.x + Int(Routing.grid) * (n % 4 + 1) }
+            }
+        }
+        let budget = store.liveRoutingBudget
+        store.checkpoint()
+        store.liveRoutingBudget = .infinity
+        print("  drag step, rerouting at once: " + time(move))
+        store.liveRoutingBudget = budget
+        store.refreshRouting()
+        print(String(format: "  drag step with the default budget (%.0f ms): ", budget * 1000) + time(move)
+              + (store.routingIsBehind ? ", routing deferred" : ""))
+        store.finishLiveEdit()
+        store.undo()
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("quartzite-autosave-timing-\(UUID().uuidString).json")
+        print("  autosave: " + time { _ in try? JSONEncoder().encode(store.design).write(to: file, options: .atomic) })
+        try? FileManager.default.removeItem(at: file)
     }
 
     @MainActor

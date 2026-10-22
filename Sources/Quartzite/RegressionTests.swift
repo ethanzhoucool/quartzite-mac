@@ -201,7 +201,140 @@ extension RegressionTests {
         testInsertSymbolRefusesRecursion()
         testMessagesLocateTheirSheet()
         testPinPlannerAssignsFromCleanStart()
+        testDragDefersSlowRouting()
+        testEndToEndFromBlankProject()
         return failures == 0
+    }
+
+    /// A student's run from a blank project, through the same Store calls as the menus and
+    /// dialogs: HA, Create Symbol Files, FA from two HA blocks, a 2-bit adder from two FA
+    /// blocks shown on HEX0 by a 7447, Pin Planner actions, compilation, simulation and
+    /// export. QUARTZITE_E2E_DIR keeps the exported folder and the .qzproj there.
+    @MainActor
+    static func testEndToEndFromBlankProject() {
+        let store = Store(persist: false)
+        store.newProject(name: "Add2", device: CycloneV.device, starterPins: false)
+        func add(_ item: PlaceItem, _ x: Int, _ y: Int, _ name: String? = nil) -> Component {
+            let n = store.project.components.count
+            assertTrue(store.place(item, at: CGPoint(x: x, y: y)), "Insert \(item.title) in \(store.project.entityName).bdf")
+            guard store.project.components.count == n + 1, let c = store.project.components.last else { return Component(kind: .gnd, name: "?", x: 0, y: 0) }
+            if let name { store.updateComponent(c.id) { $0.name = name } }
+            return store.project.component(c.id) ?? c
+        }
+        func port(_ c: Component, _ n: String) -> PortRef { PortRef(comp: c.id, port: c.portIndex(named: n) ?? -1) }
+        func out(_ c: Component) -> PortRef { PortRef(comp: c.id, port: c.portIndices.first { c.isOutputPort($0) } ?? 0) }
+        func input(_ c: Component, _ i: Int) -> PortRef { PortRef(comp: c.id, port: i) }
+
+        assertNoThrow(try store.newSheet(named: "HA"), "File > New > Block Diagram/Schematic File HA")
+        let a = add(.primitive(.input), 80, 72, "a"), b = add(.primitive(.input), 80, 136, "b")
+        let x = add(.primitive(.xor2), 320, 72), g = add(.primitive(.and2), 320, 184)
+        let s = add(.primitive(.output), 560, 80, "s"), c = add(.primitive(.output), 560, 192, "c")
+        for (from, to) in [(out(a), input(x, 0)), (out(b), input(x, 1)), (out(a), input(g, 0)), (out(b), input(g, 1)),
+                           (out(x), input(s, 0)), (out(g), input(c, 0))] { store.connect(from, to) }
+        assertEqual(store.createSymbolFiles().summary, "Created HA.bsf; updated 0 instances", "Create Symbol Files for HA")
+
+        assertNoThrow(try store.newSheet(named: "FA"), "File > New > Block Diagram/Schematic File FA")
+        let fx = add(.primitive(.input), 80, 88, "x"), fy = add(.primitive(.input), 80, 152, "y"), cin = add(.primitive(.input), 80, 344, "cin")
+        let h1 = add(.block("HA"), 320, 120), h2 = add(.block("HA"), 320, 344)
+        let or = add(.primitive(.or2), 600, 392)
+        let fs = add(.primitive(.output), 840, 344, "s"), co = add(.primitive(.output), 840, 400, "cout")
+        for (from, to) in [(out(fx), port(h1, "a")), (out(fy), port(h1, "b")), (port(h1, "s"), port(h2, "a")), (out(cin), port(h2, "b")),
+                           (port(h1, "c"), input(or, 0)), (port(h2, "c"), input(or, 1)), (port(h2, "s"), input(fs, 0)), (out(or), input(co, 0))] {
+            store.connect(from, to)
+        }
+        assertFalse(store.place(.block("FA"), at: CGPoint(x: 400, y: 600)), "Insert Symbol refuses FA inside FA.bdf")
+        assertEqual(store.createSymbolFiles().summary, "Created FA.bsf; updated 0 instances", "Create Symbol Files for FA")
+        store.openSheet(named: "HA")
+        assertFalse(store.place(.block("FA"), at: CGPoint(x: 400, y: 600)), "and FA inside HA.bdf")
+
+        store.openSheet(named: "Add2")
+        assertTrue(store.isTopSheet, "Add2.bdf is the top-level file")
+        let ins = ["a1", "a0", "b1", "b0"].enumerated().map { k, n in add(.primitive(.input), 80, 72 + 64 * k, n) }
+        let f1 = add(.block("FA"), 360, 72), f0 = add(.block("FA"), 360, 360)
+        let gnd = add(.primitive(.gnd), 240, 560)
+        store.connect(out(gnd), port(f0, "cin"))
+        for (blk, labels) in [(f0, ["x": "a0", "y": "b0", "s": "s0", "cout": "c1"]), (f1, ["x": "a1", "y": "b1", "cin": "c1", "s": "s1", "cout": "cout"])] {
+            for (p, n) in labels { store.setLabel(port(blk, p), n) }
+        }
+        let m = add(.macro("7447"), 720, 72), vcc = add(.primitive(.vcc), 600, 280), gnd2 = add(.primitive(.gnd), 600, 40)
+        for (p, n) in [("A", "s0"), ("B", "s1"), ("C", "cout")] { store.setLabel(port(m, p), n) }
+        store.connect(out(gnd2), port(m, "D"))
+        for p in ["LTN", "RBIN", "BIN"] { store.connect(out(vcc), port(m, p)) }
+        for (k, p) in ["OA", "OB", "OC", "OD", "OE", "OF", "OG"].enumerated() { store.setLabel(port(m, p), "hex0_\(k)") }
+        let leds = ["s0", "s1", "cout"].enumerated().map { k, n in add(.primitive(.output), 1040, 400 + 48 * k, n) }
+        for k in 0..<7 { _ = add(.primitive(.output), 1040, 72 + 40 * k, "hex0_\(k)") }
+
+        assertTrue(store.assignSwitches(ins.map(\.id), from: 3), "Pin Planner > Assign Switches... from SW3")
+        assertEqual(store.assignSevenSegment(prefix: "hex0_", digit: 0), 7, "Pin Planner > Assign 7-Segment Digit... HEX0")
+        for (k, led) in leds.enumerated() { store.updateComponent(led.id) { $0.location = BoardPin.named("LEDR\(k)")?.pin } }
+        assertEqual(store.pinState, .ok, "every pin has a location")
+
+        assertTrue(store.compile(), "Analysis & Elaboration")
+        let problems = store.messages.filter { $0.level == .error || $0.level == .warning }.map(\.text)
+        assertTrue(problems.isEmpty, "with no errors or warnings (\(problems))")
+        assertEqual(store.routing.warnings, [], "Add2.bdf routes without warnings")
+        store.simulate()
+        if let sim = store.simulation {
+            assertEqual(sim.rows.count, 16, "the simulation has 16 rows")
+            var wrong: [Int] = []
+            for (r, row) in sim.rows.enumerated() {
+                func bit(_ n: String) -> Int { sim.inputNames.firstIndex(of: n).map { row.inputs[$0] ? 1 : 0 } ?? -1 }
+                let sum = bit("a1") * 2 + bit("a0") + bit("b1") * 2 + bit("b0")
+                var want = ["s0": sum & 1, "s1": (sum >> 1) & 1, "cout": sum >> 2]
+                for (k, v) in TestDesigns.segments7447(sum).enumerated() { want["hex0_\(k)"] = v }
+                for (o, n) in sim.outputNames.enumerated() where want[n] != (row.outputs[o] ? 1 : 0) { wrong.append(r) }
+            }
+            assertTrue(wrong.isEmpty && sim.outputNames.count == 10, "the 2-bit adder adds and HEX0 shows the sum (wrong rows: \(wrong))")
+        } else {
+            check(false, "Run Functional Simulation")
+        }
+        let full = CompileFlow.run(store.design)
+        assertTrue(full.circuit != nil && !full.messages.contains { $0.level == .error }, "Full compilation")
+
+        let keep = ProcessInfo.processInfo.environment["QUARTZITE_E2E_DIR"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) }
+        let fm = FileManager.default
+        let dir = keep?.appendingPathComponent("Add2") ?? fm.temporaryDirectory.appendingPathComponent("quartzite-e2e-\(UUID().uuidString)")
+        defer { if keep == nil { try? fm.removeItem(at: dir) } }
+        assertTrue(store.exportBundle(into: dir, reveal: false), "Export Quartus Project")
+        let names = Set((try? fm.contentsOfDirectory(atPath: dir.path)) ?? [])
+        assertTrue(["Add2.bdf", "FA.bdf", "FA.bsf", "HA.bdf", "HA.bsf", "Add2.qpf", "Add2.qsf"].allSatisfy(names.contains),
+                   "the export has every .bdf, the block symbols and the project files (\(names.sorted()))")
+        if let keep { try? store.design.encoded().write(to: keep.appendingPathComponent("Add2.qzproj")) }
+    }
+
+    /// Drag steps on a sheet that routes slowly reroute once the pointer rests or the drag ends.
+    @MainActor
+    static func testDragDefersSlowRouting() {
+        let store = Store(persist: false)
+        store.project = TestDesigns.exampleSOP()
+        guard let c = store.project.components.first(where: { !$0.kind.isPin }) else { check(false, "exampleSOP has a gate"); return }
+        func routed() -> Bool {
+            let fresh = Routing(project: store.project, conn: Connectivity(store.project))
+            return store.routing.routes == fresh.routes && store.routing.stubs.map(\.from) == fresh.stubs.map(\.from)
+        }
+        func move(by dx: Int) { store.liveMutate { p in if let i = p.index(of: c.id) { p.components[i].x += dx } } }
+        let version = store.projectVersion
+        store.liveMutate { _ in }
+        assertEqual(store.projectVersion, version, "a drag step that moves nothing changes nothing")
+        store.checkpoint()
+        store.liveRoutingBudget = .infinity
+        move(by: 16)
+        assertFalse(store.routingIsBehind, "a sheet that routes fast reroutes on every drag step")
+        assertTrue(routed(), "and its routing follows the drag")
+        store.liveRoutingBudget = 0
+        move(by: 16)
+        assertTrue(store.routingIsBehind, "a sheet that routes slowly defers the routing during a drag")
+        store.finishLiveEdit()
+        assertFalse(store.routingIsBehind, "the end of the drag reroutes the sheet")
+        assertTrue(routed(), "to the moved symbol")
+        move(by: 16)
+        let deadline = Date().addingTimeInterval(2)
+        while store.routingIsBehind && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+        assertFalse(store.routingIsBehind, "a resting pointer reroutes the sheet")
+        assertTrue(routed(), "to where the symbol rests")
+        store.undo()
+        assertEqual(store.project.component(c.id)?.x, c.x, "the drag is one undo step")
+        assertTrue(routed(), "undo reroutes the sheet")
     }
     @MainActor
     static func testTextClipboardAndMixedSelection() {

@@ -569,6 +569,7 @@ struct SchematicCanvasContent: View {
         case .move(let s, let origins, _, let moved):
             if moved {
                 if !editor.rubberbanding { store.detachWires(movedIDs: Set(origins.keys)) }
+                store.finishLiveEdit()
             } else {
                 registerTap(at: s)
             }
