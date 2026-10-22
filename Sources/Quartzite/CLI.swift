@@ -138,6 +138,13 @@ enum CLI {
                 let d = try loadDesign(file)
                 let dir = URL(fileURLWithPath: args[i + 2], isDirectory: true)
                 if args.contains("--hardware") { return MainActor.assumeIsolated { WindowSnapshot.runHardware(d, to: dir) } ? 0 : 1 }
+                if args.contains("--programmer") {
+                    return MainActor.assumeIsolated { () -> Bool in
+                        let store = Store(persist: false)
+                        store.loadDesign(d, from: nil, dirty: false)
+                        return WindowSnapshot.runProgrammer(store, to: dir)
+                    } ? 0 : 1
+                }
                 return MainActor.assumeIsolated { WindowSnapshot.run(d, to: dir) } ? 0 : 1
             }
             #endif

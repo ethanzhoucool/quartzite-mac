@@ -209,6 +209,39 @@ enum WindowSnapshot {
         try? FileManager.default.removeItem(at: file)
     }
 
+    /// The Programmer window with a DE10-Standard chain as Auto Detect would show it, the Board
+    /// tab with a sample state, and Settings > Programmer. No hardware is used.
+    @MainActor
+    static func runProgrammer(_ store: Store, to dir: URL) -> Bool {
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let m = ProgrammerModel(persist: false)
+        let chain = [JTAGDevice(index: 0, idcode: Programmer.hpsIDCode, irLength: 4, detail: "ARM cortex A9"),
+                     JTAGDevice(index: 1, idcode: 0x02D0_20DD, irLength: 10, detail: "cyclone V Soc 5CSE*A6/5CSX*6")]
+        m.chain = chain
+        m.rows = chain.map { ProgrammerModel.Row(device: $0, deviceName: $0.name, file: nil) }
+        m.rows[1].file = URL(fileURLWithPath: "/project/output_files/\(store.topProject.entityName).sof")
+        m.rows[1].checksum = "00AF52DB"
+        m.rows[1].program = true
+        m.probes = [USBProbe(bus: 1, device: 4, vid: 0x09FB, pid: 0x6010, probe: "usb-blasterII_1", manufacturer: "Altera", serial: "none", product: "DE-SoC")]
+        m.progress = 1
+        m.status = "100% (Successful)"
+        m.log = ["$ openFPGALoader -c usb-blasterII --probe-firmware blaster_6810.hex --index-chain 1 --write-sram lab.rbf",
+                 "Load SRAM: [==================================================] 100.00%", "Done"]
+        var ok = render(ProgrammerView(model: m, defaultFile: { nil }), "programmer_chain", dir)
+        var b = BoardState()
+        b.switches = [true, false, true, true, false, false, false, false, false, true]
+        b.leds = [true, false, true, true, false, false, false, false, false, false]
+        b.keysPressed[0] = true
+        let digits: [[Bool]] = [[true, true, true, true, true, true, false], [false, true, true, false, false, false, false]]
+        b.segments[0] = digits[1]; b.segments[1] = digits[0]
+        m.board = b
+        m.tab = .board
+        m.boardMessage = "Live (boundary-scan SAMPLE; the design keeps running)"
+        ok = render(ProgrammerView(model: m, defaultFile: { nil }), "programmer_board", dir) && ok
+        ok = render(ProgrammerSettingsView(model: m), "programmer_settings", dir) && ok
+        return ok
+    }
+
     @MainActor
     private static func render(_ view: some View, _ name: String, _ dir: URL) -> Bool {
         let host = NSHostingView(rootView: view.frame(width: 1440, height: 900))
