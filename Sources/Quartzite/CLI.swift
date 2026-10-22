@@ -3,7 +3,8 @@ import Foundation
 /// Command-line entry points (also used by CI on Linux, where there is no UI).
 enum CLI {
     static let flags = ["--compile", "--selftest", "--export-suite", "--export-project", "--render-project", "--snapshot-window",
-                        "--sof-info", "--sof-to-rbf", "--rbf-to-sof", "--sof-verify", "--build-design", "--import"]
+                        "--sof-info", "--sof-to-rbf", "--rbf-to-sof", "--sof-verify", "--build-design", "--import",
+                        "--program", "--detect"]
 
     static func wants(_ args: [String]) -> Bool { args.contains { flags.contains($0) } }
 
@@ -196,12 +197,16 @@ enum CLI {
                 print("wrote \(args[i + 3]) (\(out.count) bytes)")
                 return 0
             }
+            if args.contains("--program") || args.contains("--detect") {
+                // Quartzite --program <file.sof> [--cable c] [--firmware f] [--tool t] [--dry-run] | --detect [...]
+                return runProgrammer(args)
+            }
             if args.contains("--selftest") { return SelfTest.run(args) ? 0 : 1 }
         } catch {
             FileHandle.standardError.write(Data("error: \(error.localizedDescription)\n".utf8))
             return 1
         }
-        print("usage: Quartzite --selftest [dir] | --sof-info <f.sof> | --sof-to-rbf <in.sof> <out.rbf> [--compressed] | --rbf-to-sof <in.rbf> <device> <out.sof> [--template f.sof] [--layout 14|16|17] [--project name] [--compiler-version s] | --compile <file.qzproj> [--report] [--sof <out.sof> [--layout 14|16|17] [--work dir] [--seed n]] | --sof-verify <samples dir> | --sof-verify <file.qzproj> <file.sof> [--work dir] | --export-suite <dir> | --export-project <file.qzproj> <dir> | --build-design <spec.json> <out.qzproj> | --import <file.qpf|.qsf|.bdf> <out.qzproj>")
+        print("usage: Quartzite --selftest [dir] | --sof-info <f.sof> | --sof-to-rbf <in.sof> <out.rbf> [--compressed] | --rbf-to-sof <in.rbf> <device> <out.sof> [--template f.sof] [--layout 14|16|17] [--project name] [--compiler-version s] | --compile <file.qzproj> [--report] [--sof <out.sof> [--layout 14|16|17] [--work dir] [--seed n]] | --sof-verify <samples dir> | --sof-verify <file.qzproj> <file.sof> [--work dir] | --export-suite <dir> | --export-project <file.qzproj> <dir> | --build-design <spec.json> <out.qzproj> | --import <file.qpf|.qsf|.bdf> <out.qzproj> | \(programmerUsage)")
         return 2
     }
 }
