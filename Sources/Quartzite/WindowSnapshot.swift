@@ -78,6 +78,7 @@ enum WindowSnapshot {
             } else { ok = false }
             window.close()
         }
+        if (store.simulation?.rows.count ?? 0) > 64 { measureScrolling(store) }
         // Dialogs of multi-file designs: Insert Symbol on the block's sheet, the macro's function table.
         if block != nil {
             ok = render(PropertySheetView(store: store, sheet: .symbolLibrary(at: .zero)).background(.background), "dialog_symbol", dir) && ok
@@ -123,6 +124,45 @@ enum WindowSnapshot {
             ok = render(ContentView(store: store), name, dir) && ok
         }
         return ok && store.flow?.assembly?.passed == true
+    }
+
+    /// Scrolls each scroll view of the Waveform tab offscreen, one 60-point step at a time, and
+    /// prints the time per step (scrolling, SwiftUI layout and drawing), to check that a big
+    /// truth table scrolls smoothly.
+    @MainActor
+    static func measureScrolling(_ store: Store) {
+        store.tab = .waveform
+        let host = NSHostingView(rootView: ContentView(store: store).frame(width: 1440, height: 900))
+        host.frame = NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let window = NSWindow(contentRect: host.frame, styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.contentView = host
+        for _ in 0..<5 { RunLoop.main.run(until: Date().addingTimeInterval(0.15)); host.layoutSubtreeIfNeeded() }
+        func scrollViews(_ v: NSView) -> [NSScrollView] { ((v as? NSScrollView).map { [$0] } ?? []) + v.subviews.flatMap(scrollViews) }
+        let sim = store.simulation
+        print("scroll timing, \(sim?.rows.count ?? 0) rows x \((sim?.inputNames.count ?? 0) + (sim?.outputNames.count ?? 0)) columns:")
+        for sv in scrollViews(host) {
+            guard let doc = sv.documentView else { continue }
+            let clip = sv.contentView
+            let maxY = doc.frame.height - clip.bounds.height
+            guard maxY > 100 else { continue }
+            var times: [Double] = []
+            var y = clip.bounds.minY
+            while y < maxY && times.count < 300 {
+                y = min(maxY, y + 60)
+                let t0 = CFAbsoluteTimeGetCurrent()
+                clip.scroll(to: NSPoint(x: clip.bounds.minX, y: y))
+                sv.reflectScrolledClipView(clip)
+                RunLoop.main.run(until: Date())
+                host.layoutSubtreeIfNeeded()
+                host.display()
+                times.append((CFAbsoluteTimeGetCurrent() - t0) * 1000)
+            }
+            let sorted = times.sorted()
+            print(String(format: "  scroll view %.0f x %.0f in %.0f x %.0f: %d steps, mean %.1f ms, median %.1f ms, max %.1f ms",
+                         doc.frame.width, doc.frame.height, clip.bounds.width, clip.bounds.height, times.count,
+                         times.reduce(0, +) / Double(max(1, times.count)), sorted[sorted.count / 2], sorted.last ?? 0))
+        }
+        window.close()
     }
 
     @MainActor

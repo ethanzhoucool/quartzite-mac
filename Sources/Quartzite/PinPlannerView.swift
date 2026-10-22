@@ -5,17 +5,35 @@ import SwiftUI
 struct PinPlannerView: View {
     @Bindable var store: Store
     @State private var selectedPin: UUID?
+    @State private var filter = ""
+    @State private var showDigit = false
+    @State private var showSwitches = false
+
+    /// Node Name order (natural), narrowed by the filter field.
+    private var pins: [Component] {
+        let f = filter.trimmingCharacters(in: .whitespaces)
+        return f.isEmpty ? store.pinPlannerPins : store.pinPlannerPins.filter { $0.name.localizedCaseInsensitiveContains(f) }
+    }
 
     var body: some View {
-        let pins = store.topProject.inputPins + store.topProject.outputPins
+        let pins = pins
+        let all = store.pinPlannerPins
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Pin Planner").font(.title3.weight(.semibold))
-                    Text("\(store.topProject.device), DE10-Standard. Select a node, then click a switch, push button, LED or 7-segment display segment.")
+                    Text("Top-level entity: \(store.topProject.entityName)").font(.callout.weight(.medium))
+                    Text("\(store.topProject.device), DE10-Standard. Select a node, then click a switch, push button, LED or 7-segment display segment; the next unassigned node is selected for you.")
                         .font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
+                Button("Assign 7-Segment Digit...") { showDigit = true }
+                    .disabled(store.sevenSegmentGroups.isEmpty)
+                    .help("Outputs named like hex5_0 ... hex5_6 (or seg_a ... seg_g) go to the segments of one display")
+                Button("Assign Switches...") { showSwitches = true }
+                    .disabled(store.topProject.inputPins.isEmpty)
+                    .help("Inputs in order go to SWn, SWn-1, ...")
                 Button("Auto-Assign (SW / LEDR)") { store.autoAssignPins() }
                     .help("Inputs in order (MSB first) go to SW(n-1) to SW0, outputs to LEDR0, LEDR1, ...")
                 Button("Import Assignments...") { store.importAssignments() }
@@ -24,11 +42,11 @@ struct PinPlannerView: View {
                 }
             }
             .padding(16)
-            BoardView(store: store, mode: .assign, selectedPin: $selectedPin)
+            BoardView(store: store, mode: .assign, selectedPin: $selectedPin, order: pins.map(\.id))
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
             Divider()
-            if pins.isEmpty {
+            if all.isEmpty {
                 ContentUnavailableView {
                     Label("No pins yet", systemImage: "pin.slash")
                 } description: {
@@ -39,6 +57,13 @@ struct PinPlannerView: View {
             } else {
                 HStack {
                     Text("All Pins").font(.callout.weight(.semibold))
+                    TextField("Filter node names", text: $filter)
+                        .textFieldStyle(.roundedBorder)
+                        .controlSize(.small)
+                        .frame(width: 180)
+                    let open = all.filter { ($0.location ?? "").isEmpty }.count
+                    Text(filter.isEmpty ? "\(all.count) pins, \(open) unassigned" : "\(pins.count) of \(all.count) pins, \(open) unassigned")
+                        .font(.caption).foregroundStyle(open > 0 ? Theme.warning : .secondary)
                     Spacer()
                     if store.flow?.fit == nil {
                         Text("Fitter Location fills in after Start Compilation").font(.caption).foregroundStyle(.secondary)
@@ -76,6 +101,8 @@ struct PinPlannerView: View {
             }
         }
         .onAppear { if selectedPin == nil { selectedPin = pins.first { $0.location == nil }?.id ?? pins.first?.id } }
+        .sheet(isPresented: $showDigit) { SevenSegmentAssignSheet(store: store) }
+        .sheet(isPresented: $showSwitches) { SwitchAssignSheet(store: store) }
     }
 
     /// Where the last Fitter run put the pin (same as Location unless it had none).
@@ -89,6 +116,139 @@ struct PinPlannerView: View {
         if let b = BoardPin.lookup(loc) { return b.longLabel }
         guard let pkg = CycloneV.pin(loc) else { return "Not a pin of \(CycloneV.device)" }
         return pkg.isUserIO ? "I/O pin not wired to a board resource" : (pkg.function ?? "Not an I/O pin")
+    }
+}
+
+/// Pin Planner > Assign 7-Segment Digit: one output prefix to one display.
+@MainActor
+private struct SevenSegmentAssignSheet: View {
+    @Bindable var store: Store
+    @Environment(\.dismiss) private var dismiss
+    @State private var prefix = ""
+    @State private var digit = 0
+
+    var body: some View {
+        let groups = store.sevenSegmentGroups
+        let group = groups.first { $0.prefix == prefix }
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Assign 7-Segment Digit").font(.headline)
+            Text("Outputs with a common prefix and a segment number 0 to 6 (or _a to _g) go to one display: segment 0 (a) to HEXd[0], and so on. The segments are active low: a segment lights when its output is 0.")
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+                GridRow {
+                    Text("Outputs:")
+                    Picker("", selection: $prefix) {
+                        ForEach(groups, id: \.prefix) { g in Text("\(g.prefix)*  (\(g.segments.count) of 7)").tag(g.prefix) }
+                    }
+                    .labelsHidden()
+                }
+                GridRow {
+                    Text("Display:")
+                    Picker("", selection: $digit) { ForEach(0..<6, id: \.self) { Text("HEX\($0)").tag($0) } }.labelsHidden()
+                }
+            }
+            if let group {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(group.segments.keys.sorted(), id: \.self) { k in
+                        let pin = store.topProject.component(group.segments[k]!)
+                        let board = BoardPin.named("HEX\(digit)[\(k)]")!
+                        let other = store.topProject.components.first { $0.kind.isPin && $0.location == board.pin && $0.id != pin?.id }
+                        Text("\(pin?.name ?? "?")  \u{2192}  \(board.longLabel)  \(board.pin)" + (other.map { "  (replaces \($0.name))" } ?? ""))
+                            .font(.system(.callout, design: .monospaced))
+                    }
+                }
+            }
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Assign") {
+                    store.assignSevenSegment(prefix: prefix, digit: digit)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(group == nil)
+            }
+        }
+        .padding(20)
+        .frame(width: 480)
+        .onAppear {
+            let open = groups.first { g in g.segments.values.contains { (store.topProject.component($0)?.location ?? "").isEmpty } }
+            prefix = (open ?? groups.first)?.prefix ?? ""
+            digit = suggestedDigit(prefix)
+        }
+        .onChange(of: prefix) { _, p in digit = suggestedDigit(p) }
+    }
+
+    /// The display a prefix names ("hex5_" is HEX5), or the first display nothing uses yet.
+    private func suggestedDigit(_ p: String) -> Int {
+        if let n = Int(p.filter(\.isNumber)), (0...5).contains(n) { return n }
+        let used = Set(store.topProject.outputPins.compactMap { p -> Int? in
+            guard let b = BoardPin.lookup(p.location), b.kind == .sevenSegment else { return nil }
+            return b.label.dropFirst(3).first?.wholeNumberValue
+        })
+        return (0..<6).first { !used.contains($0) } ?? 0
+    }
+}
+
+/// Pin Planner > Assign Switches: picked inputs, in order, to SWn, SWn-1, ...
+@MainActor
+private struct SwitchAssignSheet: View {
+    @Bindable var store: Store
+    @Environment(\.dismiss) private var dismiss
+    @State private var picked: Set<UUID> = []
+    @State private var start = 9
+
+    var body: some View {
+        let inputs = store.topProject.inputPins
+        let ids = inputs.filter { picked.contains($0.id) }.map(\.id)
+        let fits = !ids.isEmpty && start - (ids.count - 1) >= 0
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Assign Switches").font(.headline)
+            Text("The first checked input goes to SW\(start), the next to SW\(max(0, start - 1)), and so on down. Inputs are listed MSB first, in the simulation's input order.")
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(inputs) { p in
+                        Toggle(isOn: Binding(get: { picked.contains(p.id) },
+                                             set: { if $0 { picked.insert(p.id) } else { picked.remove(p.id) } })) {
+                            HStack {
+                                Text(p.name).monospaced()
+                                Spacer()
+                                Text(BoardPin.lookup(p.location)?.label ?? (p.location ?? "")).foregroundStyle(.secondary)
+                            }
+                        }
+                        .toggleStyle(.checkbox)
+                    }
+                }
+                .padding(6)
+            }
+            .frame(height: min(220, CGFloat(inputs.count) * 24 + 12))
+            .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(.separator))
+            Picker("Starting switch:", selection: $start) { ForEach((0..<10).reversed(), id: \.self) { Text("SW\($0)").tag($0) } }
+                .fixedSize()
+            Text(fits ? ids.enumerated().map { k, id in "\(store.topProject.component(id)?.name ?? "?") \u{2192} SW\(start - k)" }.joined(separator: ", ")
+                 : ids.isEmpty ? "Check the inputs to assign" : "\(ids.count) inputs don't fit between SW\(start) and SW0")
+                .font(.callout)
+                .foregroundStyle(fits ? Color.secondary : Theme.error)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Assign") {
+                    store.assignSwitches(ids, from: start)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!fits)
+            }
+        }
+        .padding(20)
+        .frame(width: 440)
+        .onAppear {
+            picked = Set(inputs.filter { ($0.location ?? "").isEmpty }.map(\.id))
+            if picked.isEmpty { picked = Set(inputs.map(\.id)) }
+            start = max(0, min(9, picked.count - 1))
+        }
     }
 }
 
@@ -222,6 +382,8 @@ struct BoardView: View {
     @Bindable var store: Store
     var mode: Mode
     var selectedPin: Binding<UUID?> = .constant(nil)
+    /// The Pin Planner's row order: after a click assigns a node, the next unassigned one is selected.
+    var order: [UUID]? = nil
 
     private var pins: [Component] { store.topProject.inputPins + store.topProject.outputPins }
 
@@ -269,7 +431,11 @@ struct BoardView: View {
         switch mode {
         case .assign:
             if let sel = selectedPin.wrappedValue, let pin = store.topProject.component(sel), (pin.kind == .input) == r.isInput {
-                store.assign(sel, to: owner(r.pin)?.id == sel ? nil : r.pin)
+                let clearing = owner(r.pin)?.id == sel
+                store.assign(sel, to: clearing ? nil : r.pin)
+                if !clearing, let next = store.nextUnassignedPin(after: sel, in: order ?? pins.map(\.id)) {
+                    selectedPin.wrappedValue = next
+                }
             } else if let o = owner(r.pin) {
                 selectedPin.wrappedValue = o.id
             }

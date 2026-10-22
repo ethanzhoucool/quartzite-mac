@@ -478,6 +478,82 @@ final class Store {
         }
     }
 
+    // MARK: - Pin Planner
+
+    /// The top-level pins in Node Name order, sorted naturally (a2 before a10).
+    var pinPlannerPins: [Component] {
+        (topProject.inputPins + topProject.outputPins).sorted {
+            let c = $0.name.localizedStandardCompare($1.name)
+            return c == .orderedSame ? $0.kind == .input && $1.kind != .input : c == .orderedAscending
+        }
+    }
+
+    /// The first pin without a location after `id` in `order` (wrapping round), so a board
+    /// click can move on to the next node.
+    func nextUnassignedPin(after id: UUID, in order: [UUID]) -> UUID? {
+        let top = topProject
+        func open(_ p: UUID) -> Bool { (top.component(p)?.location ?? "").isEmpty }
+        guard let i = order.firstIndex(of: id) else { return order.first(where: open) }
+        return (1..<max(1, order.count)).lazy.map { order[(i + $0) % order.count] }.first(where: open)
+    }
+
+    /// The segment a seven-segment output stands for: "hex5_3" is segment 3 of prefix "hex5_",
+    /// "seg_c" segment 2 of "seg_".
+    static func segment(of name: String) -> (prefix: String, segment: Int)? {
+        let chars = Array(name)
+        guard chars.count > 1 else { return nil }
+        let last = chars[chars.count - 1], before = chars[chars.count - 2], prefix = String(chars.dropLast())
+        if let d = last.wholeNumberValue, (0...6).contains(d), !before.isNumber { return (prefix, d) }
+        if before == "_", let k = Array("abcdefg").firstIndex(of: Character(last.lowercased())) { return (prefix, k) }
+        return nil
+    }
+
+    /// Output pins grouped by seven-segment prefix, in natural order of the prefix.
+    var sevenSegmentGroups: [(prefix: String, segments: [Int: UUID])] {
+        var groups: [String: [Int: UUID]] = [:]
+        for o in topProject.outputPins {
+            guard let (prefix, k) = Store.segment(of: o.name), groups[prefix]?[k] == nil else { continue }
+            groups[prefix, default: [:]][k] = o.id
+        }
+        return groups.keys.sorted { $0.localizedStandardCompare($1) == .orderedAscending }.map { ($0, groups[$0]!) }
+    }
+
+    /// Pin Planner > Assign 7-Segment Digit: outputs `prefix`0...6 (or a...g) go to
+    /// HEX`digit`[0...6], in one undoable step. Returns how many pins were assigned.
+    @discardableResult
+    func assignSevenSegment(prefix: String, digit: Int) -> Int {
+        guard let g = sevenSegmentGroups.first(where: { $0.prefix == prefix }) else { return 0 }
+        let pairs = g.segments.sorted { $0.key < $1.key }.compactMap { k, id in
+            BoardPin.named("HEX\(digit)[\(k)]").map { (id, $0.pin) }
+        }
+        assignAll(pairs)
+        return pairs.count
+    }
+
+    /// Pin Planner > Assign Switches: the inputs, in order, go to SW`start`, SW`start - 1`, ...
+    @discardableResult
+    func assignSwitches(_ ids: [UUID], from start: Int) -> Bool {
+        guard !ids.isEmpty, start - (ids.count - 1) >= 0 else { return false }
+        let pairs = ids.enumerated().compactMap { k, id in BoardPin.named("SW\(start - k)").map { (id, $0.pin) } }
+        guard pairs.count == ids.count else { return false }
+        assignAll(pairs)
+        return true
+    }
+
+    /// Several location assignments as one undo step; each location keeps one node.
+    private func assignAll(_ pairs: [(UUID, String)]) {
+        guard !pairs.isEmpty else { return }
+        mutateTop { p in
+            for (id, loc) in pairs {
+                for i in p.components.indices where p.components[i].id != id
+                    && p.components[i].location?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() == loc {
+                    p.components[i].location = nil
+                }
+                if let i = p.index(of: id), p.components[i].kind.isPin { p.components[i].location = loc }
+            }
+        }
+    }
+
     /// Four switch inputs w, x, y, z (SW3 to SW0) and output f (LEDR0) on the DE10-Standard.
     func insertStarterPins() {
         mutate { p in
@@ -580,6 +656,25 @@ final class Store {
         let trail = sheetID(after: hierarchyTrail) == activeSheetID ? Array(hierarchyTrail.dropLast()) : []
         openSheet(up.sheet, trail: trail)
         selection = [.comp(up.instance)]
+        return true
+    }
+
+    /// The sheet a message's component is on: the sheet it names, else the top-level sheet,
+    /// else any sheet that has the component.
+    func sheetID(for m: Message) -> UUID? {
+        guard let comp = m.component else { return nil }
+        if let name = m.sheet, let s = design.sheet(named: name), s.component(comp) != nil { return s.id }
+        if let t = design.top, t.component(comp) != nil { return t.id }
+        return design.sheets.first { $0.component(comp) != nil }?.id
+    }
+
+    /// Messages window double-click: opens the sheet the message is about and selects its
+    /// component.
+    @discardableResult
+    func locate(_ m: Message) -> Bool {
+        guard let comp = m.component, let id = sheetID(for: m) else { return false }
+        openSheet(id)
+        selection = [.comp(comp)]
         return true
     }
 

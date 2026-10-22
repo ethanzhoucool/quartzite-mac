@@ -10,6 +10,8 @@ struct SimulationView: View {
     /// Height of the input-order and expected-minterm fields; the row scrolls past `expectedLimit`.
     @State private var expectedHeight: CGFloat = 60
     private let expectedLimit: CGFloat = 150
+    /// Whether the expected-minterm fields are shown (nil: open for up to 8 outputs).
+    @State private var expectedOpen: Bool?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -123,11 +125,17 @@ struct SimulationView: View {
                         }
                     }
                 }
-                if !store.topProject.outputPins.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Expected minterms (optional)").font(.caption).foregroundStyle(.secondary)
+                let outputs = store.topProject.outputPins
+                if !outputs.isEmpty {
+                    DisclosureGroup(isExpanded: Binding(get: { expectedOpen ?? (outputs.count <= 8) }, set: { expectedOpen = $0 })) {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 340), spacing: 24, alignment: .leading)], alignment: .leading, spacing: 6) {
-                            ForEach(store.topProject.outputPins) { expectedField($0) }
+                            ForEach(outputs) { expectedField($0) }
+                        }
+                        .padding(.top, 4)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text("Expected minterms (optional)").font(.caption).foregroundStyle(.secondary)
+                            Text(expectedSummary(outputs)).font(.caption).foregroundStyle(.tertiary)
                         }
                     }
                 }
@@ -137,6 +145,17 @@ struct SimulationView: View {
             .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { expectedHeight = $0 }
         }
         .frame(height: min(expectedHeight, expectedLimit))
+    }
+
+    /// "3 of 26 outputs have expected minterms, 1 mismatch".
+    private func expectedSummary(_ outputs: [Component]) -> String {
+        let set = outputs.filter { !(store.topProject.expected[$0.id.uuidString] ?? "").trimmingCharacters(in: .whitespaces).isEmpty }.count
+        var s = "\(set) of \(outputs.count) output\(outputs.count == 1 ? "" : "s") set"
+        if let sim = store.simulation {
+            let bad = sim.outputIDs.indices.filter { sim.matches(output: $0) == false }.count
+            if bad > 0 { s += ", \(bad) mismatch\(bad == 1 ? "" : "es")" }
+        }
+        return s
     }
 
     private func expectedField(_ out: Component) -> some View {
@@ -339,22 +358,41 @@ struct WaveformSnapshot: View {
 struct TruthTableView: View {
     var sim: SimulationResult
 
+    /// Past 64 rows, or 2000 cells, the table scrolls on its own with the header pinned.
+    var scrolls: Bool {
+        let columns = sim.inputNames.count + sim.outputNames.count + sim.expected.compactMap { $0 }.count
+        return sim.rows.count > 64 || sim.rows.count * columns > 2000
+    }
+
     /// One monospaced attributed string per row, not a view per cell: 512 rows of 9 inputs and 30
     /// outputs would otherwise be ~36,000 views, rebuilt on every keystroke in an expected field.
-    /// Past 64 rows the table scrolls on its own so only the rows on screen are built.
+    /// A scrolling table builds only the rows on screen.
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(header)
-            Divider()
-            if sim.rows.count <= 64 {
-                ForEach(sim.rows.indices, id: \.self) { Text(row($0)) }
-            } else {
+            if scrolls {
                 ScrollView(.vertical) {
-                    LazyVStack(alignment: .leading, spacing: 3) {
-                        ForEach(sim.rows.indices, id: \.self) { Text(row($0)) }
+                    LazyVStack(alignment: .leading, spacing: 3, pinnedViews: [.sectionHeaders]) {
+                        Section {
+                            ForEach(sim.rows.indices, id: \.self) { Text(row($0)) }
+                        } header: {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(header)
+                                Divider()
+                            }
+                            .background {
+                                ZStack {
+                                    Color(nsColor: .windowBackgroundColor)
+                                    Rectangle().fill(.quaternary.opacity(0.4))
+                                }
+                            }
+                        }
                     }
                 }
                 .frame(height: 420)
+            } else {
+                Text(header)
+                Divider()
+                ForEach(sim.rows.indices, id: \.self) { Text(row($0)) }
             }
         }
         .font(.system(.callout, design: .monospaced))

@@ -852,12 +852,18 @@ struct MessagesPane: View {
         }
         .contentShape(Rectangle())
         .simultaneousGesture(TapGesture(count: 2).onEnded {
-            if let id = m.component, store.project.component(id) != nil {
-                store.tab = .bdf
-                store.selection = [.comp(id)]
+            guard store.locate(m) else { return }
+            let editor = EditorState.shared
+            DispatchQueue.main.async {
+                if let r = store.bounds(of: store.selection) { editor.scroller.reveal(r, zoom: store.zoom) }
             }
         })
-        .help(m.component != nil ? "Double-click to locate in \(store.project.entityName).bdf" : "")
+        .help(locateHelp(m))
+    }
+
+    private func locateHelp(_ m: Message) -> String {
+        guard let id = store.sheetID(for: m), let i = store.design.sheetIndex(id: id) else { return "" }
+        return "Double-click to locate in \(store.design.sheets[i].entityName).bdf"
     }
 
     private func badge(icon: AnyView, count: Int?) -> some View {

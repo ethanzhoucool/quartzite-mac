@@ -199,6 +199,8 @@ extension RegressionTests {
         testLegacyAutosaveRestores()
         testSheetTabsAndFileCommands()
         testInsertSymbolRefusesRecursion()
+        testMessagesLocateTheirSheet()
+        testPinPlannerAssignsFromCleanStart()
         return failures == 0
     }
     @MainActor
@@ -490,6 +492,126 @@ extension RegressionTests {
         store.openSheet(ha)
         store.paste(mixed)
         assertEqual(store.project.components.count, haCount + 1, "pasting them into HA keeps only the gate")
+    }
+
+    /// Double-clicking a message opens the sheet its component is on (plan 6.5).
+    @MainActor
+    static func testMessagesLocateTheirSheet() {
+        let store = Store(persist: false)
+        let d = HierarchySelfTest.haFA()
+        store.loadDesign(d, from: nil, dirty: false)
+        let ha = d.sheet(named: "HA")!, gate = ha.components.first { $0.kind.isGate }!
+        let m = Message(level: .warning, text: "test", component: gate.id, sheet: "HA")
+        assertEqual(store.sheetID(for: m), ha.id, "A message names the sheet its component is on")
+        assertTrue(store.locate(m), "Double-clicking it")
+        assertEqual(store.activeSheetID, ha.id, "opens that sheet")
+        assertEqual(store.selection, [.comp(gate.id)], "and selects the component")
+        let topPin = d.top!.inputPins[0]
+        assertTrue(store.locate(Message(level: .info, text: "pin", component: topPin.id)), "A message without a sheet")
+        assertEqual(store.activeSheetID, d.top!.id, "is about the top-level sheet")
+        assertFalse(store.locate(Message(level: .info, text: "none")), "A message without a component locates nothing")
+    }
+
+    /// Clears the top-level pin locations of `d` and assigns them again with the Pin Planner's
+    /// actions only: Assign Switches, Assign 7-Segment Digit and board clicks (each click
+    /// assigns the selected node and selects the next unassigned one). Nothing is typed.
+    @MainActor
+    static func replayPinAssignments(_ d: DesignProject) -> (actions: Int, pins: Int, wrong: [String]) {
+        let store = Store(persist: false)
+        store.loadDesign(d, from: nil, dirty: false)
+        let pins = store.pinPlannerPins
+        let original = Dictionary(uniqueKeysWithValues: pins.map { ($0.id, $0.location.flatMap(BoardPin.lookup)) })
+        store.mutateTop { p in for i in p.components.indices where p.components[i].kind.isPin { p.components[i].location = nil } }
+        var actions = 0
+        func number(_ label: String, after prefix: String) -> Int? {
+            label.hasPrefix(prefix) ? Int(label.dropFirst(prefix.count).prefix { $0.isNumber }) : nil
+        }
+        // Outputs whose segments all sat on one display, segment k on HEXd[k].
+        for g in store.sevenSegmentGroups {
+            let places = g.segments.map { k, id -> (Int, Int)? in
+                guard let b = original[id] ?? nil, b.kind == .sevenSegment, let dd = number(b.label, after: "HEX"),
+                      b.label.hasSuffix("[\(k)]") else { return nil }
+                return (dd, k)
+            }
+            let digits = Set(places.compactMap { $0?.0 })
+            if digits.count == 1, !places.contains(where: { $0 == nil }) {
+                store.assignSevenSegment(prefix: g.prefix, digit: digits.first!)
+                actions += 1
+            }
+        }
+        // Runs of inputs (MSB first) that sat on consecutive switches going down.
+        var run: [UUID] = [], runStart = 0
+        func flush() {
+            if !run.isEmpty, store.assignSwitches(run, from: runStart) { actions += 1 }
+            run = []
+        }
+        for p in store.topProject.inputPins {
+            guard let b = original[p.id] ?? nil, b.kind == .slideSwitch, let n = number(b.label, after: "SW") else { flush(); continue }
+            if run.isEmpty || n != runStart - run.count { flush(); runStart = n }
+            run.append(p.id)
+        }
+        flush()
+        // Board clicks for the rest, starting at the first unassigned node in Node Name order.
+        let order = store.pinPlannerPins.map(\.id)
+        var selected = order.first { (store.topProject.component($0)?.location ?? "").isEmpty }
+        var seen = Set<UUID>()
+        while let sel = selected, seen.insert(sel).inserted {
+            if let b = original[sel] ?? nil {
+                store.assign(sel, to: b.pin)
+                actions += 1
+            }
+            selected = store.nextUnassignedPin(after: sel, in: order)
+        }
+        let wrong = store.pinPlannerPins.filter { $0.location != (original[$0.id] ?? nil)?.pin }.map(\.name)
+        return (actions, pins.count, wrong)
+    }
+
+    /// Pin Planner actions for designs with many pins (plan 6.6).
+    @MainActor
+    static func testPinPlannerAssignsFromCleanStart() {
+        assertEqual(Store.segment(of: "hex5_3")?.prefix, "hex5_", "hex5_3 is a segment of hex5_")
+        assertEqual(Store.segment(of: "hex5_3")?.segment, 3, "segment 3")
+        assertEqual(Store.segment(of: "seg_c")?.segment, 2, "seg_c is segment 2")
+        assertNil(Store.segment(of: "z10"), "z10 is not a segment")
+        assertNil(Store.segment(of: "neg"), "neg is not a segment")
+        assertNil(Store.segment(of: "h7"), "7 is not a segment")
+
+        let d = TestDesigns.addSub4Display()
+        let store = Store(persist: false)
+        store.loadDesign(d, from: nil, dirty: false)
+        let names = store.pinPlannerPins.map(\.name)
+        assertTrue(names.firstIndex(of: "hex0_1")! < names.firstIndex(of: "hex4_0")!, "Node Name sorts naturally (hex0_1 before hex4_0)")
+        let groups = store.sevenSegmentGroups.map(\.prefix)
+        assertTrue(["hex0_", "hex4_", "hex5_"].allSatisfy(groups.contains), "the three displays are offered (\(groups))")
+        store.mutateTop { p in for i in p.components.indices where p.components[i].kind.isPin { p.components[i].location = nil } }
+        assertEqual(store.assignSevenSegment(prefix: "hex4_", digit: 2), 7, "Assign 7-Segment Digit assigns seven pins")
+        let hex4 = store.topProject.outputPins.filter { $0.name.hasPrefix("hex4_") }
+        assertTrue(hex4.allSatisfy { BoardPin.lookup($0.location)?.label == "HEX2[\($0.name.last!)]" }, "segment k goes to HEX2[k]")
+        store.undo()
+        assertTrue(store.topProject.outputPins.allSatisfy { $0.location == nil }, "in one undo step")
+        let ins = store.topProject.inputPins.map(\.id)
+        assertFalse(store.assignSwitches(ins, from: 5), "Assign Switches refuses inputs that don't fit below the start")
+        assertTrue(store.assignSwitches(Array(ins.prefix(3)), from: 9), "Assign Switches")
+        assertEqual(ins.prefix(3).map { BoardPin.lookup(store.topProject.component($0)?.location)?.label ?? "" }, ["SW9", "SW8", "SW7"],
+                    "puts the inputs on SW9, SW8, SW7")
+        assertTrue(store.assignSwitches([ins[3]], from: 9), "Assigning another input to SW9")
+        assertNil(store.topProject.component(ins[0])?.location, "takes SW9 from the first")
+        let order = store.pinPlannerPins.map(\.id)
+        assertEqual(store.nextUnassignedPin(after: ins[3], in: order).flatMap { store.topProject.component($0)?.location }, nil,
+                    "the next unassigned node has no location")
+
+        let replay = replayPinAssignments(d)
+        assertTrue(replay.wrong.isEmpty, "addsub4_display: all \(replay.pins) pins assigned from a clean start with \(replay.actions) Pin Planner actions (wrong: \(replay.wrong))")
+        // Designs from QUARTZITE_EXTRA_DESIGNS get the same check.
+        if let dir = ProcessInfo.processInfo.environment["QUARTZITE_EXTRA_DESIGNS"], !dir.isEmpty,
+           let files = try? FileManager.default.contentsOfDirectory(atPath: dir) {
+            for f in files.sorted() where f.hasSuffix(".qzproj") {
+                guard let data = FileManager.default.contents(atPath: (dir as NSString).appendingPathComponent(f)),
+                      let x = try? DesignProject.load(data) else { check(false, "\(f) loads"); continue }
+                let r = replayPinAssignments(x)
+                assertTrue(r.wrong.isEmpty, "\(f): all \(r.pins) pins assigned from a clean start with \(r.actions) Pin Planner actions (wrong: \(r.wrong))")
+            }
+        }
     }
 
     @MainActor
