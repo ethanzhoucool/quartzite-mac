@@ -556,7 +556,8 @@ enum HierarchySelfTest {
     static func references(_ check: Check) {
         print("Reference designs")
         let names = TestDesigns.all.map(\.0)
-        check(["macro7447_probe", "bcd_display"].allSatisfy(names.contains), "the 7447 designs are in TestDesigns.all")
+        check(["macro7447_probe", "bcd_display", "hier_fixture", "addsub4", "addsub4_display"].allSatisfy(names.contains),
+              "the reference designs are in TestDesigns.all")
 
         let probe = TestDesigns.macro7447Probe()
         if let sim = reference("macro7447_probe", probe, check).1 {
@@ -583,6 +584,91 @@ enum HierarchySelfTest {
                       "a 7447 named bcd7seg at (400, 72) is written as in a .bdf Quartus compiled")
             }
             check(text.contains("(text \"7447\" (rect 44 0 77 16)") && text.contains("(text \"VCC\""), "BcdDisplay.bdf has the 7447 and its VCC")
+        }
+
+        let hier = TestDesigns.hierFixture()
+        reference("hier_fixture", hier, check)
+        check(matches(hier) { v in
+            ["s": v["x"]! | v["y"]!, "cout": v["x"]! & v["y"]!, "result_out": v["a_long_input"]! | v["b"]!, "z": v["a_long_input"]! & v["b"]!]
+        }, "hier_fixture: HA and BIGBLK are an OR2 and an AND2 each")
+        if let b = try? QuartusExport.makeBundle(hier) {
+            for n in ["HA.bsf", "BIGBLK.bsf"] {
+                if let t = fixture("hier/\(n)", check) {
+                    let ours = b.files.first { $0.name == n }?.contents ?? ""
+                    check(afterComments(ours) == afterComments(t), "hier_fixture: \(n) is byte for byte the one Quartus wrote (after its comments)")
+                }
+            }
+        }
+
+        let add = TestDesigns.addSub4Reference()
+        reference("addsub4", add, check)
+        check(matches(add) { v in TestDesigns.addSub4Oracle(v) }, "addsub4: the expected table is the 512-row adder/subtractor")
+
+        let disp = TestDesigns.addSub4Display()
+        let t0 = Date()
+        let (state, sim) = reference("addsub4_display", disp, check)
+        let flowTime = Date().timeIntervalSince(t0)
+        check(sim?.inputNames.count == 9 && sim?.outputNames.count == 26, "addsub4_display has 9 inputs and 26 outputs")
+        if let sim {
+            // The displays show A, B and S for every row where they are 0-9.
+            var ok = true
+            for (r, row) in sim.rows.enumerated() {
+                var v: [String: Int] = [:]
+                for (k, n) in sim.inputNames.enumerated() { v[n] = (r >> (8 - k)) & 1 }
+                let out = Dictionary(uniqueKeysWithValues: zip(sim.outputNames, row.outputs))
+                func shown(_ hex: Int) -> Int? { decode((0..<7).map { out["hex\(hex)_\($0)"]! }) }
+                let a = TestDesigns.number(v, "a"), b = TestDesigns.number(v, "b")
+                let s = (0..<4).reduce(0) { $0 | (out["s\($1)"]! ? 1 : 0) << $1 }
+                let want = (a + (v["m"] == 1 ? (b ^ 15) + 1 : b)) & 15
+                if s != want || (a < 10 && shown(5) != a) || (b < 10 && shown(4) != b) || (s < 10 && shown(0) != s) { ok = false }
+            }
+            check(ok, "addsub4_display: HEX5 shows A, HEX4 shows B and HEX0 shows S = A +/- B (mod 16)")
+        }
+        if let f = state.flat {
+            check(f.sheetsUsed == ["AddSub4Display", "AddSub4", "FA", "HA"] && f.macrosUsed == ["7447"], "addsub4_display uses four sheets and the 7447")
+        }
+        if let b = try? QuartusExport.makeBundle(disp) {
+            let names = b.files.map(\.name)
+            check(names == ["AddSub4Display.qpf", "AddSub4Display.qsf", "AddSub4Display.bdf", "AddSub4.bdf", "FA.bdf", "HA.bdf",
+                            "AddSub4.bsf", "FA.bsf", "HA.bsf", "Waveform.vwf", "AddSub4Display_pins.qsf",
+                            "AddSub4Display_backup.v", "README_LAB.txt"], "the addsub4_display bundle has 4 .bdf files and the 3 block symbols (\(names))")
+            let q = b.files.first { $0.name == "AddSub4Display.qsf" }?.contents ?? ""
+            let lines = q.split(separator: "\n")
+            check(lines.filter { $0.hasPrefix("set_global_assignment -name BDF_FILE ") }.count == 4
+                  && lines.contains("set_global_assignment -name TOP_LEVEL_ENTITY AddSub4Display"),
+                  "the .qsf lists 4 .bdf files and sets AddSub4Display as the top-level entity")
+            let located = lines.filter { $0.hasPrefix("set_location_assignment") }.compactMap { $0.split(separator: " ").last.map(String.init) }
+            check(located.count == 35 && Set(located) == Set((disp.top?.inputPins ?? []).map(\.name) + (disp.top?.outputPins ?? []).map(\.name)),
+                  "the .qsf places the 35 top-level pins and no child pins")
+        }
+
+        // Timing (plan 3.7): Analysis & Synthesis, and flattening plus the full simulation.
+        let ts = Date()
+        var simRows = 0
+        if let f = Flattener.flatten(disp).0, let c = Compiler.elaborateFlat(f).0, let s = try? SimulationResult.run(c, project: f.project) { simRows = s.rows.count }
+        let simTime = Date().timeIntervalSince(ts)
+        let synth = state.run(.analysisSynthesis)?.elapsed ?? 0
+        print(String(format: "  info addsub4_display timing: Analysis & Synthesis %.2f s, full flow %.2f s, flatten + %d-row simulation %.0f ms",
+                     synth, flowTime, simRows, simTime * 1000))
+
+        extraDesigns(check)
+    }
+
+    /// Every *.qzproj in QUARTZITE_EXTRA_DESIGNS (when set) must compile without errors and
+    /// simulate to the expected minterms stored on its outputs.
+    static func extraDesigns(_ check: Check) {
+        guard let dir = ProcessInfo.processInfo.environment["QUARTZITE_EXTRA_DESIGNS"], !dir.isEmpty else { return }
+        let url = URL(fileURLWithPath: dir, isDirectory: true)
+        let files = ((try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.pathExtension == "qzproj" }.sorted { $0.path < $1.path }
+        check(!files.isEmpty, "QUARTZITE_EXTRA_DESIGNS (\(dir)) has .qzproj files")
+        for f in files {
+            guard let data = try? Data(contentsOf: f), let d = try? DesignProject.load(data) else {
+                check(false, "\(f.lastPathComponent) loads"); continue
+            }
+            let (state, sim) = reference(f.lastPathComponent, d, check)
+            if let sim { check(sim.outputNames.indices.allSatisfy { sim.matches(output: $0) != nil }, "\(f.lastPathComponent): every output has an expected table") }
+            _ = state
         }
     }
 

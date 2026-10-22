@@ -243,6 +243,93 @@ enum TestDesigns {
         return d
     }
 
+    /// What AddSub4 computes: S = A + (B xor m) + m (4 bits) and the carry out.
+    static func addSub4Oracle(_ v: [String: Int]) -> [String: Int] {
+        let m = v["m"]!
+        let sum = number(v, "a") + (m == 1 ? number(v, "b") ^ 15 : number(v, "b")) + m
+        var out = ["cout": (sum >> 4) & 1]
+        for i in 0..<4 { out["s\(i)"] = (sum >> i) & 1 }
+        return out
+    }
+
+    /// AddSub4 with its expected table.
+    static func addSub4Reference() -> DesignProject {
+        var d = addSub4Design()
+        setExpected(&d, addSub4Oracle)
+        return d
+    }
+
+    /// HA (x, y -> s, cout) and BIGBLK (a_long_input, b -> result_out, z) named like the
+    /// Quartus 18.0 fixtures in ci/fixtures/quartus18/hier, each an OR2 and an AND2, placed
+    /// in hiertop where the fixture's hiertop.bdf has them. Inputs SW3..SW0, outputs LEDR3..LEDR0.
+    static func hierFixture() -> DesignProject {
+        var db = DesignBuilder("hiertop")
+        let parts = [("HA", ["x", "y"], ["s", "cout"]), ("BIGBLK", ["a_long_input", "b"], ["result_out", "z"])]
+        for (n, ins, outs) in parts {
+            var b = db.builder(n)
+            for (k, i) in ins.enumerated() { b.input(i, x: 40, y: 100 + 40 * k) }
+            let o = b.gate(.or2, x: 300, y: 92), a = b.gate(.and2, x: 300, y: 172)
+            for g in [o, a] { b.label(b.pin(g, 0), ins[0]); b.label(b.pin(g, 1), ins[1]) }
+            b.wire(o, to: b.output(outs[0], x: 420, y: 108), 0)
+            b.wire(a, to: b.output(outs[1], x: 420, y: 188), 0)
+            db.sheet(b)
+            db.createSymbol(n)
+        }
+        var t = db.builder("hiertop")
+        let ins = parts.flatMap(\.1), outs = parts.flatMap(\.2)
+        t.p.inputOrder = ins.enumerated().map { k, n in t.input(n, y: 64 + 48 * k, loc: BoardPin.named("SW\(3 - k)")?.pin).id }
+        for (k, n) in outs.enumerated() { t.output(n, x: 640, y: 64 + 48 * k, loc: BoardPin.named("LEDR\(3 - k)")?.pin) }
+        for (n, x, y) in [("HA", 240, 272), ("BIGBLK", 240, 720)] {
+            let blk = t.block(n, x: x, y: y)
+            let (_, i, o) = parts.first { $0.0 == n }!
+            for p in i + o { t.label(t.port(blk, p), p) }
+        }
+        db.sheet(t)
+        setExpected(&db.d) { v in
+            ["s": v["x"]! | v["y"]!, "cout": v["x"]! & v["y"]!, "result_out": v["a_long_input"]! | v["b"]!, "z": v["a_long_input"]! & v["b"]!]
+        }
+        return db.d
+    }
+
+    /// AddSub4 (HA -> FA -> AddSub4) with A on HEX5, B on HEX4 and S on HEX0 through 7447s,
+    /// S on LEDR3..LEDR0 and cout on LEDR4: 9 inputs, 26 outputs.
+    static func addSub4Display() -> DesignProject {
+        var db = DesignBuilder("AddSub4Display")
+        db.sheet(halfAdder(db))
+        db.createSymbol("HA")
+        db.sheet(fullAdder(db))
+        db.createSymbol("FA")
+        db.sheet(addSub4(db, locations: false))
+        db.createSymbol("AddSub4")
+        var t = db.builder("AddSub4Display")
+        var order: [UUID] = []
+        for (k, i) in (0..<4).reversed().enumerated() { order.append(t.input("a\(i)", y: 64 + 48 * k, loc: BoardPin.named("SW\(6 + i)")?.pin).id) }
+        for (k, i) in (0..<4).reversed().enumerated() { order.append(t.input("b\(i)", y: 256 + 48 * k, loc: BoardPin.named("SW\(2 + i)")?.pin).id) }
+        order.append(t.input("m", y: 448, loc: BoardPin.named("SW0")?.pin).id)
+        t.p.inputOrder = order
+        let blk = t.block("AddSub4", x: 280, y: 40)
+        for i in 0..<4 { for n in ["a", "b", "s"] { t.label(t.port(blk, "\(n)\(i)"), "\(n)\(i)") } }
+        t.label(t.port(blk, "m"), "m"); t.label(t.port(blk, "cout"), "cout")
+        for (j, (digit, hex)) in [("a", 5), ("b", 4), ("s", 0)].enumerated() {
+            let y = 40 + 240 * j
+            let segs = (0..<7).map { "hex\(hex)_\($0)" }
+            display(&t, x: 640, y: y, digit: (0..<4).map { "\(digit)\($0)" }, segments: segs)
+            for (k, n) in segs.enumerated() { t.output(n, x: 900, y: y + 8 + 24 * k, loc: BoardPin.named("HEX\(hex)[\(k)]")?.pin) }
+        }
+        for i in 0..<4 { t.output("s\(i)", x: 900, y: 784 + 24 * (3 - i), loc: BoardPin.named("LEDR\(i)")?.pin) }
+        t.output("cout", x: 900, y: 760, loc: BoardPin.named("LEDR4")?.pin)
+        db.sheet(t)
+        setExpected(&db.d) { v in
+            var out = addSub4Oracle(v)
+            let s = (0..<4).reduce(0) { $0 | out["s\($1)"]! << $1 }
+            for (digit, hex) in [(number(v, "a"), 5), (number(v, "b"), 4), (s, 0)] {
+                for (k, bit) in segments7447(digit).enumerated() { out["hex\(hex)_\(k)"] = bit }
+            }
+            return out
+        }
+        return db.d
+    }
+
     /// DE10-Standard switches SW3..SW0 for w, x, y, z and LEDR0 for f.
     static let starterLocations = ["w": "PIN_AC30", "x": "PIN_AB28", "y": "PIN_Y27", "z": "PIN_AB30", "f": "PIN_AA24"]
 
@@ -394,6 +481,7 @@ enum TestDesigns {
     static var all: [(String, DesignProject)] {
         legacy.map { ($0.0, DesignProject(single: $0.1)) } + [
             ("macro7447_probe", macro7447Probe()), ("bcd_display", bcdDisplay()),
+            ("hier_fixture", hierFixture()), ("addsub4", addSub4Reference()), ("addsub4_display", addSub4Display()),
         ]
     }
 

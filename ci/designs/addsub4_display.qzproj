@@ -1,0 +1,6204 @@
+{
+  "device" : "5CSXFC6D6F31C6",
+  "formatVersion" : 2,
+  "name" : "AddSub4Display",
+  "sheets" : [
+    {
+      "components" : [
+        {
+          "id" : "FFBC163D-497D-49DC-8DB3-1AF2486FB24D",
+          "kind" : "input",
+          "name" : "a",
+          "x" : 32,
+          "y" : 64
+        },
+        {
+          "id" : "56B12A48-48AA-4C86-9889-868EE12966EC",
+          "kind" : "input",
+          "name" : "b",
+          "x" : 32,
+          "y" : 112
+        },
+        {
+          "id" : "8A95F56A-4CA4-40D7-836A-4F566668DA69",
+          "kind" : "xor2",
+          "name" : "inst",
+          "x" : 320,
+          "y" : 40
+        },
+        {
+          "id" : "F7776A4F-6612-4A6E-B4B2-7059F07231D4",
+          "kind" : "and2",
+          "name" : "inst1",
+          "x" : 320,
+          "y" : 136
+        },
+        {
+          "id" : "A0769823-6860-4044-9B11-98752AE71CBE",
+          "kind" : "output",
+          "name" : "s",
+          "x" : 480,
+          "y" : 56
+        },
+        {
+          "id" : "8D33CE60-A588-4F3E-BB36-7F0B94591E25",
+          "kind" : "output",
+          "name" : "c",
+          "x" : 480,
+          "y" : 152
+        }
+      ],
+      "device" : "5CSXFC6D6F31C6",
+      "expected" : {
+
+      },
+      "id" : "66E07D8D-3E0A-419F-B863-626F2A1DF820",
+      "inputOrder" : [
+
+      ],
+      "labels" : {
+        "8A95F56A-4CA4-40D7-836A-4F566668DA69#0" : "a",
+        "8A95F56A-4CA4-40D7-836A-4F566668DA69#1" : "b",
+        "F7776A4F-6612-4A6E-B4B2-7059F07231D4#0" : "a",
+        "F7776A4F-6612-4A6E-B4B2-7059F07231D4#1" : "b"
+      },
+      "name" : "HA",
+      "symbol" : {
+        "drawing" : [
+          {
+            "rectangle" : {
+              "_0" : [
+                16,
+                16,
+                80,
+                80
+              ]
+            }
+          }
+        ],
+        "height" : 96,
+        "instanceText" : {
+          "bold" : false,
+          "font" : "Intel Clear",
+          "invisible" : false,
+          "rect" : [
+            8,
+            75,
+            24,
+            92
+          ],
+          "text" : "inst"
+        },
+        "name" : "HA",
+        "nameText" : {
+          "bold" : false,
+          "font" : "Intel Clear",
+          "invisible" : false,
+          "rect" : [
+            5,
+            0,
+            22,
+            19
+          ],
+          "size" : 8,
+          "text" : "HA"
+        },
+        "ports" : [
+          {
+            "isOutput" : false,
+            "line" : [
+              0,
+              32,
+              16,
+              32
+            ],
+            "name" : "a",
+            "pt" : [
+              0,
+              32
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                6,
+                19
+              ],
+              "size" : 8,
+              "text" : "a"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                21,
+                27,
+                27,
+                46
+              ],
+              "size" : 8,
+              "text" : "a"
+            }
+          },
+          {
+            "isOutput" : false,
+            "line" : [
+              0,
+              48,
+              16,
+              48
+            ],
+            "name" : "b",
+            "pt" : [
+              0,
+              48
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                8,
+                19
+              ],
+              "size" : 8,
+              "text" : "b"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                21,
+                43,
+                29,
+                62
+              ],
+              "size" : 8,
+              "text" : "b"
+            }
+          },
+          {
+            "isOutput" : true,
+            "line" : [
+              96,
+              32,
+              80,
+              32
+            ],
+            "name" : "s",
+            "pt" : [
+              96,
+              32
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                5,
+                19
+              ],
+              "size" : 8,
+              "text" : "s"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                70,
+                27,
+                75,
+                46
+              ],
+              "size" : 8,
+              "text" : "s"
+            }
+          },
+          {
+            "isOutput" : true,
+            "line" : [
+              96,
+              48,
+              80,
+              48
+            ],
+            "name" : "c",
+            "pt" : [
+              96,
+              48
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                6,
+                19
+              ],
+              "size" : 8,
+              "text" : "c"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                69,
+                43,
+                75,
+                62
+              ],
+              "size" : 8,
+              "text" : "c"
+            }
+          }
+        ],
+        "source" : "project",
+        "width" : 96
+      },
+      "wires" : [
+        {
+          "a" : {
+            "comp" : "8A95F56A-4CA4-40D7-836A-4F566668DA69",
+            "port" : 2
+          },
+          "b" : {
+            "comp" : "A0769823-6860-4044-9B11-98752AE71CBE",
+            "port" : 0
+          },
+          "id" : "1F41B00B-0694-42E8-B724-7BE5E4288A17"
+        },
+        {
+          "a" : {
+            "comp" : "F7776A4F-6612-4A6E-B4B2-7059F07231D4",
+            "port" : 2
+          },
+          "b" : {
+            "comp" : "8D33CE60-A588-4F3E-BB36-7F0B94591E25",
+            "port" : 0
+          },
+          "id" : "6986B15A-74B1-44AC-B190-7749BDD6C0E6"
+        }
+      ]
+    },
+    {
+      "components" : [
+        {
+          "id" : "32CE92B0-6FEC-4A37-BFCD-F6A99F9A9B4B",
+          "kind" : "input",
+          "name" : "x",
+          "x" : 32,
+          "y" : 64
+        },
+        {
+          "id" : "F656BC31-615C-44FB-8C1E-F98AE9B1ABC8",
+          "kind" : "input",
+          "name" : "y",
+          "x" : 32,
+          "y" : 112
+        },
+        {
+          "id" : "36CF3ECF-FC28-4632-B55A-EB0BBF5AC5C1",
+          "kind" : "input",
+          "name" : "cin",
+          "x" : 32,
+          "y" : 160
+        },
+        {
+          "id" : "7D661054-2DE9-425B-9262-6C105B42D3C0",
+          "kind" : "block",
+          "name" : "inst",
+          "symbol" : {
+            "drawing" : [
+              {
+                "rectangle" : {
+                  "_0" : [
+                    16,
+                    16,
+                    80,
+                    80
+                  ]
+                }
+              }
+            ],
+            "height" : 96,
+            "instanceText" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                8,
+                75,
+                24,
+                92
+              ],
+              "text" : "inst"
+            },
+            "name" : "HA",
+            "nameText" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                5,
+                0,
+                22,
+                19
+              ],
+              "size" : 8,
+              "text" : "HA"
+            },
+            "ports" : [
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  32,
+                  16,
+                  32
+                ],
+                "name" : "a",
+                "pt" : [
+                  0,
+                  32
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    6,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "a"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    27,
+                    27,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "a"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  48,
+                  16,
+                  48
+                ],
+                "name" : "b",
+                "pt" : [
+                  0,
+                  48
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    8,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "b"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    43,
+                    29,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "b"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  32,
+                  80,
+                  32
+                ],
+                "name" : "s",
+                "pt" : [
+                  96,
+                  32
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    5,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "s"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    70,
+                    27,
+                    75,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "s"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  48,
+                  80,
+                  48
+                ],
+                "name" : "c",
+                "pt" : [
+                  96,
+                  48
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    6,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "c"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    69,
+                    43,
+                    75,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "c"
+                }
+              }
+            ],
+            "source" : "project",
+            "width" : 96
+          },
+          "x" : 280,
+          "y" : 40
+        },
+        {
+          "id" : "C244A1EC-058A-4E5E-8E05-B38E39C958FF",
+          "kind" : "block",
+          "name" : "inst1",
+          "symbol" : {
+            "drawing" : [
+              {
+                "rectangle" : {
+                  "_0" : [
+                    16,
+                    16,
+                    80,
+                    80
+                  ]
+                }
+              }
+            ],
+            "height" : 96,
+            "instanceText" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                8,
+                75,
+                24,
+                92
+              ],
+              "text" : "inst"
+            },
+            "name" : "HA",
+            "nameText" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                5,
+                0,
+                22,
+                19
+              ],
+              "size" : 8,
+              "text" : "HA"
+            },
+            "ports" : [
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  32,
+                  16,
+                  32
+                ],
+                "name" : "a",
+                "pt" : [
+                  0,
+                  32
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    6,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "a"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    27,
+                    27,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "a"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  48,
+                  16,
+                  48
+                ],
+                "name" : "b",
+                "pt" : [
+                  0,
+                  48
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    8,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "b"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    43,
+                    29,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "b"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  32,
+                  80,
+                  32
+                ],
+                "name" : "s",
+                "pt" : [
+                  96,
+                  32
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    5,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "s"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    70,
+                    27,
+                    75,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "s"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  48,
+                  80,
+                  48
+                ],
+                "name" : "c",
+                "pt" : [
+                  96,
+                  48
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    6,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "c"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    69,
+                    43,
+                    75,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "c"
+                }
+              }
+            ],
+            "source" : "project",
+            "width" : 96
+          },
+          "x" : 280,
+          "y" : 200
+        },
+        {
+          "id" : "4D3DA44A-52C6-4DB8-969D-45AAB58196B5",
+          "kind" : "or2",
+          "name" : "inst2",
+          "x" : 520,
+          "y" : 280
+        },
+        {
+          "id" : "C5F59DD2-3498-400B-BA21-019BE3665A6A",
+          "kind" : "output",
+          "name" : "s",
+          "x" : 680,
+          "y" : 224
+        },
+        {
+          "id" : "BAC9A73A-37D3-484C-BFC1-F25D2A14D6CB",
+          "kind" : "output",
+          "name" : "cout",
+          "x" : 680,
+          "y" : 296
+        }
+      ],
+      "device" : "5CSXFC6D6F31C6",
+      "expected" : {
+
+      },
+      "id" : "81EDFBEB-B581-4F5A-A958-6A92327F176E",
+      "inputOrder" : [
+
+      ],
+      "labels" : {
+        "4D3DA44A-52C6-4DB8-969D-45AAB58196B5#0" : "c1",
+        "7D661054-2DE9-425B-9262-6C105B42D3C0#0" : "x",
+        "7D661054-2DE9-425B-9262-6C105B42D3C0#1" : "y",
+        "7D661054-2DE9-425B-9262-6C105B42D3C0#2" : "s1",
+        "7D661054-2DE9-425B-9262-6C105B42D3C0#3" : "c1",
+        "C244A1EC-058A-4E5E-8E05-B38E39C958FF#0" : "s1",
+        "C244A1EC-058A-4E5E-8E05-B38E39C958FF#1" : "cin"
+      },
+      "name" : "FA",
+      "symbol" : {
+        "drawing" : [
+          {
+            "rectangle" : {
+              "_0" : [
+                16,
+                16,
+                80,
+                96
+              ]
+            }
+          }
+        ],
+        "height" : 112,
+        "instanceText" : {
+          "bold" : false,
+          "font" : "Intel Clear",
+          "invisible" : false,
+          "rect" : [
+            8,
+            91,
+            24,
+            108
+          ],
+          "text" : "inst"
+        },
+        "name" : "FA",
+        "nameText" : {
+          "bold" : false,
+          "font" : "Intel Clear",
+          "invisible" : false,
+          "rect" : [
+            5,
+            0,
+            20,
+            19
+          ],
+          "size" : 8,
+          "text" : "FA"
+        },
+        "ports" : [
+          {
+            "isOutput" : false,
+            "line" : [
+              0,
+              32,
+              16,
+              32
+            ],
+            "name" : "x",
+            "pt" : [
+              0,
+              32
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                5,
+                19
+              ],
+              "size" : 8,
+              "text" : "x"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                21,
+                27,
+                26,
+                46
+              ],
+              "size" : 8,
+              "text" : "x"
+            }
+          },
+          {
+            "isOutput" : false,
+            "line" : [
+              0,
+              48,
+              16,
+              48
+            ],
+            "name" : "y",
+            "pt" : [
+              0,
+              48
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                7,
+                19
+              ],
+              "size" : 8,
+              "text" : "y"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                21,
+                43,
+                28,
+                62
+              ],
+              "size" : 8,
+              "text" : "y"
+            }
+          },
+          {
+            "isOutput" : false,
+            "line" : [
+              0,
+              64,
+              16,
+              64
+            ],
+            "name" : "cin",
+            "pt" : [
+              0,
+              64
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                16,
+                19
+              ],
+              "size" : 8,
+              "text" : "cin"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                21,
+                59,
+                37,
+                78
+              ],
+              "size" : 8,
+              "text" : "cin"
+            }
+          },
+          {
+            "isOutput" : true,
+            "line" : [
+              96,
+              32,
+              80,
+              32
+            ],
+            "name" : "s",
+            "pt" : [
+              96,
+              32
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                5,
+                19
+              ],
+              "size" : 8,
+              "text" : "s"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                70,
+                27,
+                75,
+                46
+              ],
+              "size" : 8,
+              "text" : "s"
+            }
+          },
+          {
+            "isOutput" : true,
+            "line" : [
+              96,
+              48,
+              80,
+              48
+            ],
+            "name" : "cout",
+            "pt" : [
+              96,
+              48
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                24,
+                19
+              ],
+              "size" : 8,
+              "text" : "cout"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                51,
+                43,
+                75,
+                62
+              ],
+              "size" : 8,
+              "text" : "cout"
+            }
+          }
+        ],
+        "source" : "project",
+        "width" : 96
+      },
+      "wires" : [
+        {
+          "a" : {
+            "comp" : "C244A1EC-058A-4E5E-8E05-B38E39C958FF",
+            "port" : 3
+          },
+          "b" : {
+            "comp" : "4D3DA44A-52C6-4DB8-969D-45AAB58196B5",
+            "port" : 1
+          },
+          "id" : "B76041B8-4735-4C01-8CF9-A8E987DADB34"
+        },
+        {
+          "a" : {
+            "comp" : "C244A1EC-058A-4E5E-8E05-B38E39C958FF",
+            "port" : 2
+          },
+          "b" : {
+            "comp" : "C5F59DD2-3498-400B-BA21-019BE3665A6A",
+            "port" : 0
+          },
+          "id" : "8FE767BE-BAF8-4D8E-86E7-ADAAA252151A"
+        },
+        {
+          "a" : {
+            "comp" : "4D3DA44A-52C6-4DB8-969D-45AAB58196B5",
+            "port" : 2
+          },
+          "b" : {
+            "comp" : "BAC9A73A-37D3-484C-BFC1-F25D2A14D6CB",
+            "port" : 0
+          },
+          "id" : "DBCF82BB-592B-412E-800F-CA685A901577"
+        }
+      ]
+    },
+    {
+      "components" : [
+        {
+          "id" : "92A50AC6-C137-4AB9-B230-DE24556A58DC",
+          "kind" : "input",
+          "name" : "a3",
+          "x" : 32,
+          "y" : 64
+        },
+        {
+          "id" : "584B260A-3A61-4DE6-A3CB-7F07812906E8",
+          "kind" : "input",
+          "name" : "a2",
+          "x" : 32,
+          "y" : 112
+        },
+        {
+          "id" : "260DDDD6-59A1-491D-A8D9-274673334D6E",
+          "kind" : "input",
+          "name" : "a1",
+          "x" : 32,
+          "y" : 160
+        },
+        {
+          "id" : "811D3F57-BA54-4754-BE4B-0909CAE0032D",
+          "kind" : "input",
+          "name" : "a0",
+          "x" : 32,
+          "y" : 208
+        },
+        {
+          "id" : "F2B875E8-F07F-46EB-92FB-F861D6276C27",
+          "kind" : "input",
+          "name" : "b3",
+          "x" : 32,
+          "y" : 272
+        },
+        {
+          "id" : "01C13EB8-107C-41F2-87F9-81A13E319DCD",
+          "kind" : "input",
+          "name" : "b2",
+          "x" : 32,
+          "y" : 320
+        },
+        {
+          "id" : "0B25DDF5-FDCE-4F90-90D2-D6B90D28D3C9",
+          "kind" : "input",
+          "name" : "b1",
+          "x" : 32,
+          "y" : 368
+        },
+        {
+          "id" : "8D0468CE-A484-4A47-A6B6-25E0A6DB84F7",
+          "kind" : "input",
+          "name" : "b0",
+          "x" : 32,
+          "y" : 416
+        },
+        {
+          "id" : "9BD6C97D-4CF2-43E9-B39C-06B0129B0E6E",
+          "kind" : "input",
+          "name" : "m",
+          "x" : 32,
+          "y" : 480
+        },
+        {
+          "id" : "584D2A38-07AA-4CD5-A21D-A58D8E7FABAD",
+          "kind" : "xor2",
+          "name" : "inst",
+          "x" : 240,
+          "y" : 560
+        },
+        {
+          "id" : "A4A3300F-9798-4638-B32B-F56E2E698A4D",
+          "kind" : "block",
+          "name" : "inst1",
+          "symbol" : {
+            "drawing" : [
+              {
+                "rectangle" : {
+                  "_0" : [
+                    16,
+                    16,
+                    80,
+                    96
+                  ]
+                }
+              }
+            ],
+            "height" : 112,
+            "instanceText" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                8,
+                91,
+                24,
+                108
+              ],
+              "text" : "inst"
+            },
+            "name" : "FA",
+            "nameText" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                5,
+                0,
+                20,
+                19
+              ],
+              "size" : 8,
+              "text" : "FA"
+            },
+            "ports" : [
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  32,
+                  16,
+                  32
+                ],
+                "name" : "x",
+                "pt" : [
+                  0,
+                  32
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    5,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "x"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    27,
+                    26,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "x"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  48,
+                  16,
+                  48
+                ],
+                "name" : "y",
+                "pt" : [
+                  0,
+                  48
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    7,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "y"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    43,
+                    28,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "y"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  64,
+                  16,
+                  64
+                ],
+                "name" : "cin",
+                "pt" : [
+                  0,
+                  64
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    16,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "cin"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    59,
+                    37,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "cin"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  32,
+                  80,
+                  32
+                ],
+                "name" : "s",
+                "pt" : [
+                  96,
+                  32
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    5,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "s"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    70,
+                    27,
+                    75,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "s"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  48,
+                  80,
+                  48
+                ],
+                "name" : "cout",
+                "pt" : [
+                  96,
+                  48
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    24,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "cout"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    51,
+                    43,
+                    75,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "cout"
+                }
+              }
+            ],
+            "source" : "project",
+            "width" : 96
+          },
+          "x" : 440,
+          "y" : 520
+        },
+        {
+          "id" : "7DD2D9E0-D480-4472-8BA6-1137AD6CB695",
+          "kind" : "xor2",
+          "name" : "inst2",
+          "x" : 240,
+          "y" : 400
+        },
+        {
+          "id" : "24E142AA-7EFA-4E78-B7F2-422B86411998",
+          "kind" : "block",
+          "name" : "inst3",
+          "symbol" : {
+            "drawing" : [
+              {
+                "rectangle" : {
+                  "_0" : [
+                    16,
+                    16,
+                    80,
+                    96
+                  ]
+                }
+              }
+            ],
+            "height" : 112,
+            "instanceText" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                8,
+                91,
+                24,
+                108
+              ],
+              "text" : "inst"
+            },
+            "name" : "FA",
+            "nameText" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                5,
+                0,
+                20,
+                19
+              ],
+              "size" : 8,
+              "text" : "FA"
+            },
+            "ports" : [
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  32,
+                  16,
+                  32
+                ],
+                "name" : "x",
+                "pt" : [
+                  0,
+                  32
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    5,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "x"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    27,
+                    26,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "x"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  48,
+                  16,
+                  48
+                ],
+                "name" : "y",
+                "pt" : [
+                  0,
+                  48
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    7,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "y"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    43,
+                    28,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "y"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  64,
+                  16,
+                  64
+                ],
+                "name" : "cin",
+                "pt" : [
+                  0,
+                  64
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    16,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "cin"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    59,
+                    37,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "cin"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  32,
+                  80,
+                  32
+                ],
+                "name" : "s",
+                "pt" : [
+                  96,
+                  32
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    5,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "s"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    70,
+                    27,
+                    75,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "s"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  48,
+                  80,
+                  48
+                ],
+                "name" : "cout",
+                "pt" : [
+                  96,
+                  48
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    24,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "cout"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    51,
+                    43,
+                    75,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "cout"
+                }
+              }
+            ],
+            "source" : "project",
+            "width" : 96
+          },
+          "x" : 440,
+          "y" : 360
+        },
+        {
+          "id" : "D9BF11AE-C3EF-444D-B396-BBB5C929C90F",
+          "kind" : "xor2",
+          "name" : "inst4",
+          "x" : 240,
+          "y" : 240
+        },
+        {
+          "id" : "B58DACFD-B742-46E2-9CCC-2C3A3BB542E0",
+          "kind" : "block",
+          "name" : "inst5",
+          "symbol" : {
+            "drawing" : [
+              {
+                "rectangle" : {
+                  "_0" : [
+                    16,
+                    16,
+                    80,
+                    96
+                  ]
+                }
+              }
+            ],
+            "height" : 112,
+            "instanceText" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                8,
+                91,
+                24,
+                108
+              ],
+              "text" : "inst"
+            },
+            "name" : "FA",
+            "nameText" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                5,
+                0,
+                20,
+                19
+              ],
+              "size" : 8,
+              "text" : "FA"
+            },
+            "ports" : [
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  32,
+                  16,
+                  32
+                ],
+                "name" : "x",
+                "pt" : [
+                  0,
+                  32
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    5,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "x"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    27,
+                    26,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "x"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  48,
+                  16,
+                  48
+                ],
+                "name" : "y",
+                "pt" : [
+                  0,
+                  48
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    7,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "y"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    43,
+                    28,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "y"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  64,
+                  16,
+                  64
+                ],
+                "name" : "cin",
+                "pt" : [
+                  0,
+                  64
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    16,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "cin"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    59,
+                    37,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "cin"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  32,
+                  80,
+                  32
+                ],
+                "name" : "s",
+                "pt" : [
+                  96,
+                  32
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    5,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "s"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    70,
+                    27,
+                    75,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "s"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  48,
+                  80,
+                  48
+                ],
+                "name" : "cout",
+                "pt" : [
+                  96,
+                  48
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    24,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "cout"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    51,
+                    43,
+                    75,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "cout"
+                }
+              }
+            ],
+            "source" : "project",
+            "width" : 96
+          },
+          "x" : 440,
+          "y" : 200
+        },
+        {
+          "id" : "15789394-BF92-432F-82B7-9DC7C135E174",
+          "kind" : "xor2",
+          "name" : "inst6",
+          "x" : 240,
+          "y" : 80
+        },
+        {
+          "id" : "6A0901B0-20DB-4520-96EA-42BC44464BE4",
+          "kind" : "block",
+          "name" : "inst7",
+          "symbol" : {
+            "drawing" : [
+              {
+                "rectangle" : {
+                  "_0" : [
+                    16,
+                    16,
+                    80,
+                    96
+                  ]
+                }
+              }
+            ],
+            "height" : 112,
+            "instanceText" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                8,
+                91,
+                24,
+                108
+              ],
+              "text" : "inst"
+            },
+            "name" : "FA",
+            "nameText" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                5,
+                0,
+                20,
+                19
+              ],
+              "size" : 8,
+              "text" : "FA"
+            },
+            "ports" : [
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  32,
+                  16,
+                  32
+                ],
+                "name" : "x",
+                "pt" : [
+                  0,
+                  32
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    5,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "x"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    27,
+                    26,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "x"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  48,
+                  16,
+                  48
+                ],
+                "name" : "y",
+                "pt" : [
+                  0,
+                  48
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    7,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "y"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    43,
+                    28,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "y"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  64,
+                  16,
+                  64
+                ],
+                "name" : "cin",
+                "pt" : [
+                  0,
+                  64
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    16,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "cin"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    59,
+                    37,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "cin"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  32,
+                  80,
+                  32
+                ],
+                "name" : "s",
+                "pt" : [
+                  96,
+                  32
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    5,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "s"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    70,
+                    27,
+                    75,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "s"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  48,
+                  80,
+                  48
+                ],
+                "name" : "cout",
+                "pt" : [
+                  96,
+                  48
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    24,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "cout"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    51,
+                    43,
+                    75,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "cout"
+                }
+              }
+            ],
+            "source" : "project",
+            "width" : 96
+          },
+          "x" : 440,
+          "y" : 40
+        },
+        {
+          "id" : "88D2860D-6C17-4C31-A0DD-B209F682E178",
+          "kind" : "output",
+          "name" : "s0",
+          "x" : 760,
+          "y" : 208
+        },
+        {
+          "id" : "28284901-0A1F-445A-9D63-05954B1D8070",
+          "kind" : "output",
+          "name" : "s1",
+          "x" : 760,
+          "y" : 160
+        },
+        {
+          "id" : "02075BE0-C6B4-4DD7-BA19-29A76729DCA8",
+          "kind" : "output",
+          "name" : "s2",
+          "x" : 760,
+          "y" : 112
+        },
+        {
+          "id" : "03ACD0CA-385D-47A5-A398-4EC945D16DD8",
+          "kind" : "output",
+          "name" : "s3",
+          "x" : 760,
+          "y" : 64
+        },
+        {
+          "id" : "64578A70-83A8-4782-AABE-554E979061B5",
+          "kind" : "output",
+          "name" : "cout",
+          "x" : 760,
+          "y" : 16
+        }
+      ],
+      "device" : "5CSXFC6D6F31C6",
+      "expected" : {
+
+      },
+      "id" : "7C4B8CB1-14B0-482C-A080-21ADF858159A",
+      "inputOrder" : [
+        "92A50AC6-C137-4AB9-B230-DE24556A58DC",
+        "584B260A-3A61-4DE6-A3CB-7F07812906E8",
+        "260DDDD6-59A1-491D-A8D9-274673334D6E",
+        "811D3F57-BA54-4754-BE4B-0909CAE0032D",
+        "F2B875E8-F07F-46EB-92FB-F861D6276C27",
+        "01C13EB8-107C-41F2-87F9-81A13E319DCD",
+        "0B25DDF5-FDCE-4F90-90D2-D6B90D28D3C9",
+        "8D0468CE-A484-4A47-A6B6-25E0A6DB84F7",
+        "9BD6C97D-4CF2-43E9-B39C-06B0129B0E6E"
+      ],
+      "labels" : {
+        "15789394-BF92-432F-82B7-9DC7C135E174#0" : "b3",
+        "15789394-BF92-432F-82B7-9DC7C135E174#1" : "m",
+        "15789394-BF92-432F-82B7-9DC7C135E174#2" : "y3",
+        "24E142AA-7EFA-4E78-B7F2-422B86411998#0" : "a1",
+        "24E142AA-7EFA-4E78-B7F2-422B86411998#1" : "y1",
+        "24E142AA-7EFA-4E78-B7F2-422B86411998#2" : "c1",
+        "24E142AA-7EFA-4E78-B7F2-422B86411998#3" : "s1",
+        "24E142AA-7EFA-4E78-B7F2-422B86411998#4" : "c2",
+        "584D2A38-07AA-4CD5-A21D-A58D8E7FABAD#0" : "b0",
+        "584D2A38-07AA-4CD5-A21D-A58D8E7FABAD#1" : "m",
+        "584D2A38-07AA-4CD5-A21D-A58D8E7FABAD#2" : "y0",
+        "6A0901B0-20DB-4520-96EA-42BC44464BE4#0" : "a3",
+        "6A0901B0-20DB-4520-96EA-42BC44464BE4#1" : "y3",
+        "6A0901B0-20DB-4520-96EA-42BC44464BE4#2" : "c3",
+        "6A0901B0-20DB-4520-96EA-42BC44464BE4#3" : "s3",
+        "6A0901B0-20DB-4520-96EA-42BC44464BE4#4" : "cout",
+        "7DD2D9E0-D480-4472-8BA6-1137AD6CB695#0" : "b1",
+        "7DD2D9E0-D480-4472-8BA6-1137AD6CB695#1" : "m",
+        "7DD2D9E0-D480-4472-8BA6-1137AD6CB695#2" : "y1",
+        "A4A3300F-9798-4638-B32B-F56E2E698A4D#0" : "a0",
+        "A4A3300F-9798-4638-B32B-F56E2E698A4D#1" : "y0",
+        "A4A3300F-9798-4638-B32B-F56E2E698A4D#2" : "m",
+        "A4A3300F-9798-4638-B32B-F56E2E698A4D#3" : "s0",
+        "A4A3300F-9798-4638-B32B-F56E2E698A4D#4" : "c1",
+        "B58DACFD-B742-46E2-9CCC-2C3A3BB542E0#0" : "a2",
+        "B58DACFD-B742-46E2-9CCC-2C3A3BB542E0#1" : "y2",
+        "B58DACFD-B742-46E2-9CCC-2C3A3BB542E0#2" : "c2",
+        "B58DACFD-B742-46E2-9CCC-2C3A3BB542E0#3" : "s2",
+        "B58DACFD-B742-46E2-9CCC-2C3A3BB542E0#4" : "c3",
+        "D9BF11AE-C3EF-444D-B396-BBB5C929C90F#0" : "b2",
+        "D9BF11AE-C3EF-444D-B396-BBB5C929C90F#1" : "m",
+        "D9BF11AE-C3EF-444D-B396-BBB5C929C90F#2" : "y2"
+      },
+      "name" : "AddSub4",
+      "symbol" : {
+        "drawing" : [
+          {
+            "rectangle" : {
+              "_0" : [
+                16,
+                16,
+                80,
+                192
+              ]
+            }
+          }
+        ],
+        "height" : 208,
+        "instanceText" : {
+          "bold" : false,
+          "font" : "Intel Clear",
+          "invisible" : false,
+          "rect" : [
+            8,
+            187,
+            24,
+            204
+          ],
+          "text" : "inst"
+        },
+        "name" : "AddSub4",
+        "nameText" : {
+          "bold" : false,
+          "font" : "Intel Clear",
+          "invisible" : false,
+          "rect" : [
+            5,
+            0,
+            57,
+            19
+          ],
+          "size" : 8,
+          "text" : "AddSub4"
+        },
+        "ports" : [
+          {
+            "isOutput" : false,
+            "line" : [
+              0,
+              32,
+              16,
+              32
+            ],
+            "name" : "a3",
+            "pt" : [
+              0,
+              32
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                12,
+                19
+              ],
+              "size" : 8,
+              "text" : "a3"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                21,
+                27,
+                33,
+                46
+              ],
+              "size" : 8,
+              "text" : "a3"
+            }
+          },
+          {
+            "isOutput" : false,
+            "line" : [
+              0,
+              48,
+              16,
+              48
+            ],
+            "name" : "a2",
+            "pt" : [
+              0,
+              48
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                12,
+                19
+              ],
+              "size" : 8,
+              "text" : "a2"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                21,
+                43,
+                33,
+                62
+              ],
+              "size" : 8,
+              "text" : "a2"
+            }
+          },
+          {
+            "isOutput" : false,
+            "line" : [
+              0,
+              64,
+              16,
+              64
+            ],
+            "name" : "a1",
+            "pt" : [
+              0,
+              64
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                12,
+                19
+              ],
+              "size" : 8,
+              "text" : "a1"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                21,
+                59,
+                33,
+                78
+              ],
+              "size" : 8,
+              "text" : "a1"
+            }
+          },
+          {
+            "isOutput" : false,
+            "line" : [
+              0,
+              80,
+              16,
+              80
+            ],
+            "name" : "a0",
+            "pt" : [
+              0,
+              80
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                12,
+                19
+              ],
+              "size" : 8,
+              "text" : "a0"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                21,
+                75,
+                33,
+                94
+              ],
+              "size" : 8,
+              "text" : "a0"
+            }
+          },
+          {
+            "isOutput" : false,
+            "line" : [
+              0,
+              96,
+              16,
+              96
+            ],
+            "name" : "b3",
+            "pt" : [
+              0,
+              96
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                14,
+                19
+              ],
+              "size" : 8,
+              "text" : "b3"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                21,
+                91,
+                35,
+                110
+              ],
+              "size" : 8,
+              "text" : "b3"
+            }
+          },
+          {
+            "isOutput" : false,
+            "line" : [
+              0,
+              112,
+              16,
+              112
+            ],
+            "name" : "b2",
+            "pt" : [
+              0,
+              112
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                14,
+                19
+              ],
+              "size" : 8,
+              "text" : "b2"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                21,
+                107,
+                35,
+                126
+              ],
+              "size" : 8,
+              "text" : "b2"
+            }
+          },
+          {
+            "isOutput" : false,
+            "line" : [
+              0,
+              128,
+              16,
+              128
+            ],
+            "name" : "b1",
+            "pt" : [
+              0,
+              128
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                14,
+                19
+              ],
+              "size" : 8,
+              "text" : "b1"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                21,
+                123,
+                35,
+                142
+              ],
+              "size" : 8,
+              "text" : "b1"
+            }
+          },
+          {
+            "isOutput" : false,
+            "line" : [
+              0,
+              144,
+              16,
+              144
+            ],
+            "name" : "b0",
+            "pt" : [
+              0,
+              144
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                14,
+                19
+              ],
+              "size" : 8,
+              "text" : "b0"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                21,
+                139,
+                35,
+                158
+              ],
+              "size" : 8,
+              "text" : "b0"
+            }
+          },
+          {
+            "isOutput" : false,
+            "line" : [
+              0,
+              160,
+              16,
+              160
+            ],
+            "name" : "m",
+            "pt" : [
+              0,
+              160
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                10,
+                19
+              ],
+              "size" : 8,
+              "text" : "m"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                21,
+                155,
+                31,
+                174
+              ],
+              "size" : 8,
+              "text" : "m"
+            }
+          },
+          {
+            "isOutput" : true,
+            "line" : [
+              96,
+              32,
+              80,
+              32
+            ],
+            "name" : "cout",
+            "pt" : [
+              96,
+              32
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                24,
+                19
+              ],
+              "size" : 8,
+              "text" : "cout"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                51,
+                27,
+                75,
+                46
+              ],
+              "size" : 8,
+              "text" : "cout"
+            }
+          },
+          {
+            "isOutput" : true,
+            "line" : [
+              96,
+              48,
+              80,
+              48
+            ],
+            "name" : "s3",
+            "pt" : [
+              96,
+              48
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                11,
+                19
+              ],
+              "size" : 8,
+              "text" : "s3"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                64,
+                43,
+                75,
+                62
+              ],
+              "size" : 8,
+              "text" : "s3"
+            }
+          },
+          {
+            "isOutput" : true,
+            "line" : [
+              96,
+              64,
+              80,
+              64
+            ],
+            "name" : "s2",
+            "pt" : [
+              96,
+              64
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                11,
+                19
+              ],
+              "size" : 8,
+              "text" : "s2"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                64,
+                59,
+                75,
+                78
+              ],
+              "size" : 8,
+              "text" : "s2"
+            }
+          },
+          {
+            "isOutput" : true,
+            "line" : [
+              96,
+              80,
+              80,
+              80
+            ],
+            "name" : "s1",
+            "pt" : [
+              96,
+              80
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                11,
+                19
+              ],
+              "size" : 8,
+              "text" : "s1"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                64,
+                75,
+                75,
+                94
+              ],
+              "size" : 8,
+              "text" : "s1"
+            }
+          },
+          {
+            "isOutput" : true,
+            "line" : [
+              96,
+              96,
+              80,
+              96
+            ],
+            "name" : "s0",
+            "pt" : [
+              96,
+              96
+            ],
+            "text1" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                0,
+                0,
+                11,
+                19
+              ],
+              "size" : 8,
+              "text" : "s0"
+            },
+            "text2" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                64,
+                91,
+                75,
+                110
+              ],
+              "size" : 8,
+              "text" : "s0"
+            }
+          }
+        ],
+        "source" : "project",
+        "width" : 96
+      },
+      "wires" : [
+
+      ]
+    },
+    {
+      "components" : [
+        {
+          "id" : "532FD183-2B2B-4B7A-8F9B-D72D1C3D7B48",
+          "kind" : "input",
+          "location" : "PIN_AA30",
+          "name" : "a3",
+          "x" : 32,
+          "y" : 64
+        },
+        {
+          "id" : "A72985F8-0224-438E-A3B4-BFBE0A06950C",
+          "kind" : "input",
+          "location" : "PIN_AC29",
+          "name" : "a2",
+          "x" : 32,
+          "y" : 112
+        },
+        {
+          "id" : "D1A7A757-F9CB-4DBD-AA9D-76DAEF4ED109",
+          "kind" : "input",
+          "location" : "PIN_AD30",
+          "name" : "a1",
+          "x" : 32,
+          "y" : 160
+        },
+        {
+          "id" : "4777CFDE-871C-4A30-8FB5-D9445AE83A88",
+          "kind" : "input",
+          "location" : "PIN_AC28",
+          "name" : "a0",
+          "x" : 32,
+          "y" : 208
+        },
+        {
+          "id" : "9BAD196B-7CDF-4036-A7AE-BF7311155A37",
+          "kind" : "input",
+          "location" : "PIN_V25",
+          "name" : "b3",
+          "x" : 32,
+          "y" : 256
+        },
+        {
+          "id" : "5098EC4F-16E2-4494-A173-A48E432241C5",
+          "kind" : "input",
+          "location" : "PIN_W25",
+          "name" : "b2",
+          "x" : 32,
+          "y" : 304
+        },
+        {
+          "id" : "53DBFF5E-D5EC-4643-834F-567AFF688E5C",
+          "kind" : "input",
+          "location" : "PIN_AC30",
+          "name" : "b1",
+          "x" : 32,
+          "y" : 352
+        },
+        {
+          "id" : "2E45E063-75EA-445D-8596-61A8294A17EB",
+          "kind" : "input",
+          "location" : "PIN_AB28",
+          "name" : "b0",
+          "x" : 32,
+          "y" : 400
+        },
+        {
+          "id" : "33834AC1-9EF8-431A-B474-85EFB7D9D91A",
+          "kind" : "input",
+          "location" : "PIN_AB30",
+          "name" : "m",
+          "x" : 32,
+          "y" : 448
+        },
+        {
+          "id" : "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4",
+          "kind" : "block",
+          "name" : "inst",
+          "symbol" : {
+            "drawing" : [
+              {
+                "rectangle" : {
+                  "_0" : [
+                    16,
+                    16,
+                    80,
+                    192
+                  ]
+                }
+              }
+            ],
+            "height" : 208,
+            "instanceText" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                8,
+                187,
+                24,
+                204
+              ],
+              "text" : "inst"
+            },
+            "name" : "AddSub4",
+            "nameText" : {
+              "bold" : false,
+              "font" : "Intel Clear",
+              "invisible" : false,
+              "rect" : [
+                5,
+                0,
+                57,
+                19
+              ],
+              "size" : 8,
+              "text" : "AddSub4"
+            },
+            "ports" : [
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  32,
+                  16,
+                  32
+                ],
+                "name" : "a3",
+                "pt" : [
+                  0,
+                  32
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    12,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "a3"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    27,
+                    33,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "a3"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  48,
+                  16,
+                  48
+                ],
+                "name" : "a2",
+                "pt" : [
+                  0,
+                  48
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    12,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "a2"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    43,
+                    33,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "a2"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  64,
+                  16,
+                  64
+                ],
+                "name" : "a1",
+                "pt" : [
+                  0,
+                  64
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    12,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "a1"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    59,
+                    33,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "a1"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  80,
+                  16,
+                  80
+                ],
+                "name" : "a0",
+                "pt" : [
+                  0,
+                  80
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    12,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "a0"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    75,
+                    33,
+                    94
+                  ],
+                  "size" : 8,
+                  "text" : "a0"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  96,
+                  16,
+                  96
+                ],
+                "name" : "b3",
+                "pt" : [
+                  0,
+                  96
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    14,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "b3"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    91,
+                    35,
+                    110
+                  ],
+                  "size" : 8,
+                  "text" : "b3"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  112,
+                  16,
+                  112
+                ],
+                "name" : "b2",
+                "pt" : [
+                  0,
+                  112
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    14,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "b2"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    107,
+                    35,
+                    126
+                  ],
+                  "size" : 8,
+                  "text" : "b2"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  128,
+                  16,
+                  128
+                ],
+                "name" : "b1",
+                "pt" : [
+                  0,
+                  128
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    14,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "b1"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    123,
+                    35,
+                    142
+                  ],
+                  "size" : 8,
+                  "text" : "b1"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  144,
+                  16,
+                  144
+                ],
+                "name" : "b0",
+                "pt" : [
+                  0,
+                  144
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    14,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "b0"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    139,
+                    35,
+                    158
+                  ],
+                  "size" : 8,
+                  "text" : "b0"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  160,
+                  16,
+                  160
+                ],
+                "name" : "m",
+                "pt" : [
+                  0,
+                  160
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    10,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "m"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    155,
+                    31,
+                    174
+                  ],
+                  "size" : 8,
+                  "text" : "m"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  32,
+                  80,
+                  32
+                ],
+                "name" : "cout",
+                "pt" : [
+                  96,
+                  32
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    24,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "cout"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    51,
+                    27,
+                    75,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "cout"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  48,
+                  80,
+                  48
+                ],
+                "name" : "s3",
+                "pt" : [
+                  96,
+                  48
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    11,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "s3"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    64,
+                    43,
+                    75,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "s3"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  64,
+                  80,
+                  64
+                ],
+                "name" : "s2",
+                "pt" : [
+                  96,
+                  64
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    11,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "s2"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    64,
+                    59,
+                    75,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "s2"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  80,
+                  80,
+                  80
+                ],
+                "name" : "s1",
+                "pt" : [
+                  96,
+                  80
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    11,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "s1"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    64,
+                    75,
+                    75,
+                    94
+                  ],
+                  "size" : 8,
+                  "text" : "s1"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  96,
+                  96,
+                  80,
+                  96
+                ],
+                "name" : "s0",
+                "pt" : [
+                  96,
+                  96
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    0,
+                    0,
+                    11,
+                    19
+                  ],
+                  "size" : 8,
+                  "text" : "s0"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Intel Clear",
+                  "invisible" : false,
+                  "rect" : [
+                    64,
+                    91,
+                    75,
+                    110
+                  ],
+                  "size" : 8,
+                  "text" : "s0"
+                }
+              }
+            ],
+            "source" : "project",
+            "width" : 96
+          },
+          "x" : 280,
+          "y" : 40
+        },
+        {
+          "id" : "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824",
+          "kind" : "macro",
+          "name" : "inst1",
+          "symbol" : {
+            "drawing" : [
+              {
+                "text" : {
+                  "_0" : {
+                    "bold" : false,
+                    "font" : "Arial",
+                    "invisible" : false,
+                    "rect" : [
+                      25,
+                      145,
+                      105,
+                      159
+                    ],
+                    "size" : 8,
+                    "text" : "BCD TO 7SEG"
+                  }
+                }
+              },
+              {
+                "line" : {
+                  "_0" : [
+                    16,
+                    16,
+                    104,
+                    16
+                  ]
+                }
+              },
+              {
+                "line" : {
+                  "_0" : [
+                    16,
+                    144,
+                    104,
+                    144
+                  ]
+                }
+              },
+              {
+                "line" : {
+                  "_0" : [
+                    16,
+                    144,
+                    16,
+                    16
+                  ]
+                }
+              },
+              {
+                "line" : {
+                  "_0" : [
+                    104,
+                    144,
+                    104,
+                    16
+                  ]
+                }
+              },
+              {
+                "circle" : {
+                  "_0" : [
+                    8,
+                    116,
+                    16,
+                    124
+                  ]
+                }
+              },
+              {
+                "circle" : {
+                  "_0" : [
+                    8,
+                    100,
+                    16,
+                    108
+                  ]
+                }
+              },
+              {
+                "circle" : {
+                  "_0" : [
+                    8,
+                    84,
+                    16,
+                    92
+                  ]
+                }
+              },
+              {
+                "circle" : {
+                  "_0" : [
+                    104,
+                    132,
+                    112,
+                    140
+                  ]
+                }
+              }
+            ],
+            "height" : 160,
+            "instanceText" : {
+              "bold" : false,
+              "font" : "Arial",
+              "invisible" : false,
+              "rect" : [
+                3,
+                149,
+                18,
+                159
+              ],
+              "size" : 6,
+              "text" : "inst"
+            },
+            "libraryPath" : [
+              "others",
+              "maxplus2"
+            ],
+            "name" : "7447",
+            "nameText" : {
+              "bold" : false,
+              "font" : "Arial",
+              "invisible" : false,
+              "rect" : [
+                44,
+                0,
+                77,
+                16
+              ],
+              "size" : 10,
+              "text" : "7447"
+            },
+            "ports" : [
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  88,
+                  8,
+                  88
+                ],
+                "name" : "LTN",
+                "pt" : [
+                  0,
+                  88
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    80,
+                    43,
+                    94
+                  ],
+                  "size" : 8,
+                  "text" : "LTN"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    80,
+                    43,
+                    94
+                  ],
+                  "size" : 8,
+                  "text" : "LTN"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  40,
+                  16,
+                  40
+                ],
+                "name" : "B",
+                "pt" : [
+                  0,
+                  40
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    32,
+                    29,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "B"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    32,
+                    29,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "B"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  56,
+                  16,
+                  56
+                ],
+                "name" : "C",
+                "pt" : [
+                  0,
+                  56
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    48,
+                    29,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "C"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    48,
+                    29,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "C"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  72,
+                  16,
+                  72
+                ],
+                "name" : "D",
+                "pt" : [
+                  0,
+                  72
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    64,
+                    29,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "D"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    64,
+                    29,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "D"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  104,
+                  8,
+                  104
+                ],
+                "name" : "RBIN",
+                "pt" : [
+                  0,
+                  104
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    96,
+                    48,
+                    110
+                  ],
+                  "size" : 8,
+                  "text" : "RBIN"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    96,
+                    48,
+                    110
+                  ],
+                  "size" : 8,
+                  "text" : "RBIN"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  120,
+                  8,
+                  120
+                ],
+                "name" : "BIN",
+                "pt" : [
+                  0,
+                  120
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    112,
+                    39,
+                    126
+                  ],
+                  "size" : 8,
+                  "text" : "BIN"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    112,
+                    39,
+                    126
+                  ],
+                  "size" : 8,
+                  "text" : "BIN"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  24,
+                  16,
+                  24
+                ],
+                "name" : "A",
+                "pt" : [
+                  0,
+                  24
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    16,
+                    30,
+                    30
+                  ],
+                  "size" : 8,
+                  "text" : "A"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    16,
+                    30,
+                    30
+                  ],
+                  "size" : 8,
+                  "text" : "A"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  40,
+                  120,
+                  40
+                ],
+                "name" : "OB",
+                "pt" : [
+                  120,
+                  40
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    32,
+                    98,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "OB"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    85,
+                    32,
+                    102,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "OB"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  56,
+                  120,
+                  56
+                ],
+                "name" : "OC",
+                "pt" : [
+                  120,
+                  56
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    48,
+                    98,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "OC"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    85,
+                    48,
+                    102,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "OC"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  88,
+                  120,
+                  88
+                ],
+                "name" : "OE",
+                "pt" : [
+                  120,
+                  88
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    80,
+                    97,
+                    94
+                  ],
+                  "size" : 8,
+                  "text" : "OE"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    86,
+                    80,
+                    102,
+                    94
+                  ],
+                  "size" : 8,
+                  "text" : "OE"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  72,
+                  120,
+                  72
+                ],
+                "name" : "OD",
+                "pt" : [
+                  120,
+                  72
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    64,
+                    98,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "OD"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    85,
+                    64,
+                    102,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "OD"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  104,
+                  120,
+                  104
+                ],
+                "name" : "OF",
+                "pt" : [
+                  120,
+                  104
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    96,
+                    97,
+                    110
+                  ],
+                  "size" : 8,
+                  "text" : "OF"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    86,
+                    96,
+                    102,
+                    110
+                  ],
+                  "size" : 8,
+                  "text" : "OF"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  120,
+                  120,
+                  120
+                ],
+                "name" : "OG",
+                "pt" : [
+                  120,
+                  120
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    112,
+                    99,
+                    126
+                  ],
+                  "size" : 8,
+                  "text" : "OG"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    84,
+                    112,
+                    102,
+                    126
+                  ],
+                  "size" : 8,
+                  "text" : "OG"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  24,
+                  120,
+                  24
+                ],
+                "name" : "OA",
+                "pt" : [
+                  120,
+                  24
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    16,
+                    99,
+                    30
+                  ],
+                  "size" : 8,
+                  "text" : "OA"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    84,
+                    16,
+                    102,
+                    30
+                  ],
+                  "size" : 8,
+                  "text" : "OA"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  112,
+                  136,
+                  120,
+                  136
+                ],
+                "name" : "RBON",
+                "pt" : [
+                  120,
+                  136
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    65,
+                    128,
+                    99,
+                    142
+                  ],
+                  "size" : 8,
+                  "text" : "RBON"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    79,
+                    128,
+                    113,
+                    142
+                  ],
+                  "size" : 8,
+                  "text" : "RBON"
+                }
+              }
+            ],
+            "source" : "library",
+            "width" : 120
+          },
+          "x" : 640,
+          "y" : 40
+        },
+        {
+          "id" : "CA8FD3A1-AE2D-4550-BF1A-482819D3A3DC",
+          "kind" : "vcc",
+          "name" : "inst2",
+          "x" : 544,
+          "y" : 176
+        },
+        {
+          "id" : "C870ABE0-5DA1-474B-919E-D52A17457D31",
+          "kind" : "output",
+          "location" : "PIN_AF21",
+          "name" : "hex5_0",
+          "x" : 900,
+          "y" : 48
+        },
+        {
+          "id" : "9976C6ED-728F-4139-A1BE-9A6EA6A54BD6",
+          "kind" : "output",
+          "location" : "PIN_AG21",
+          "name" : "hex5_1",
+          "x" : 900,
+          "y" : 72
+        },
+        {
+          "id" : "4E493596-4017-408D-97B8-5AC88B8C154D",
+          "kind" : "output",
+          "location" : "PIN_AF20",
+          "name" : "hex5_2",
+          "x" : 900,
+          "y" : 96
+        },
+        {
+          "id" : "D8CE1B43-01BF-4B89-8435-0E95415945A4",
+          "kind" : "output",
+          "location" : "PIN_AG20",
+          "name" : "hex5_3",
+          "x" : 900,
+          "y" : 120
+        },
+        {
+          "id" : "2C44B128-0E55-4753-86BE-0A22AFCE33FE",
+          "kind" : "output",
+          "location" : "PIN_AE19",
+          "name" : "hex5_4",
+          "x" : 900,
+          "y" : 144
+        },
+        {
+          "id" : "158508AD-2593-4BD2-9F2E-6C7DEDD2C4F7",
+          "kind" : "output",
+          "location" : "PIN_AF19",
+          "name" : "hex5_5",
+          "x" : 900,
+          "y" : 168
+        },
+        {
+          "id" : "537A4DB5-3584-4002-B678-0B5555CEEFB4",
+          "kind" : "output",
+          "location" : "PIN_AB21",
+          "name" : "hex5_6",
+          "x" : 900,
+          "y" : 192
+        },
+        {
+          "id" : "61F67193-9C81-47C7-AB99-E2F469B87088",
+          "kind" : "macro",
+          "name" : "inst3",
+          "symbol" : {
+            "drawing" : [
+              {
+                "text" : {
+                  "_0" : {
+                    "bold" : false,
+                    "font" : "Arial",
+                    "invisible" : false,
+                    "rect" : [
+                      25,
+                      145,
+                      105,
+                      159
+                    ],
+                    "size" : 8,
+                    "text" : "BCD TO 7SEG"
+                  }
+                }
+              },
+              {
+                "line" : {
+                  "_0" : [
+                    16,
+                    16,
+                    104,
+                    16
+                  ]
+                }
+              },
+              {
+                "line" : {
+                  "_0" : [
+                    16,
+                    144,
+                    104,
+                    144
+                  ]
+                }
+              },
+              {
+                "line" : {
+                  "_0" : [
+                    16,
+                    144,
+                    16,
+                    16
+                  ]
+                }
+              },
+              {
+                "line" : {
+                  "_0" : [
+                    104,
+                    144,
+                    104,
+                    16
+                  ]
+                }
+              },
+              {
+                "circle" : {
+                  "_0" : [
+                    8,
+                    116,
+                    16,
+                    124
+                  ]
+                }
+              },
+              {
+                "circle" : {
+                  "_0" : [
+                    8,
+                    100,
+                    16,
+                    108
+                  ]
+                }
+              },
+              {
+                "circle" : {
+                  "_0" : [
+                    8,
+                    84,
+                    16,
+                    92
+                  ]
+                }
+              },
+              {
+                "circle" : {
+                  "_0" : [
+                    104,
+                    132,
+                    112,
+                    140
+                  ]
+                }
+              }
+            ],
+            "height" : 160,
+            "instanceText" : {
+              "bold" : false,
+              "font" : "Arial",
+              "invisible" : false,
+              "rect" : [
+                3,
+                149,
+                18,
+                159
+              ],
+              "size" : 6,
+              "text" : "inst"
+            },
+            "libraryPath" : [
+              "others",
+              "maxplus2"
+            ],
+            "name" : "7447",
+            "nameText" : {
+              "bold" : false,
+              "font" : "Arial",
+              "invisible" : false,
+              "rect" : [
+                44,
+                0,
+                77,
+                16
+              ],
+              "size" : 10,
+              "text" : "7447"
+            },
+            "ports" : [
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  88,
+                  8,
+                  88
+                ],
+                "name" : "LTN",
+                "pt" : [
+                  0,
+                  88
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    80,
+                    43,
+                    94
+                  ],
+                  "size" : 8,
+                  "text" : "LTN"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    80,
+                    43,
+                    94
+                  ],
+                  "size" : 8,
+                  "text" : "LTN"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  40,
+                  16,
+                  40
+                ],
+                "name" : "B",
+                "pt" : [
+                  0,
+                  40
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    32,
+                    29,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "B"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    32,
+                    29,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "B"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  56,
+                  16,
+                  56
+                ],
+                "name" : "C",
+                "pt" : [
+                  0,
+                  56
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    48,
+                    29,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "C"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    48,
+                    29,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "C"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  72,
+                  16,
+                  72
+                ],
+                "name" : "D",
+                "pt" : [
+                  0,
+                  72
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    64,
+                    29,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "D"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    64,
+                    29,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "D"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  104,
+                  8,
+                  104
+                ],
+                "name" : "RBIN",
+                "pt" : [
+                  0,
+                  104
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    96,
+                    48,
+                    110
+                  ],
+                  "size" : 8,
+                  "text" : "RBIN"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    96,
+                    48,
+                    110
+                  ],
+                  "size" : 8,
+                  "text" : "RBIN"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  120,
+                  8,
+                  120
+                ],
+                "name" : "BIN",
+                "pt" : [
+                  0,
+                  120
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    112,
+                    39,
+                    126
+                  ],
+                  "size" : 8,
+                  "text" : "BIN"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    112,
+                    39,
+                    126
+                  ],
+                  "size" : 8,
+                  "text" : "BIN"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  24,
+                  16,
+                  24
+                ],
+                "name" : "A",
+                "pt" : [
+                  0,
+                  24
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    16,
+                    30,
+                    30
+                  ],
+                  "size" : 8,
+                  "text" : "A"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    16,
+                    30,
+                    30
+                  ],
+                  "size" : 8,
+                  "text" : "A"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  40,
+                  120,
+                  40
+                ],
+                "name" : "OB",
+                "pt" : [
+                  120,
+                  40
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    32,
+                    98,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "OB"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    85,
+                    32,
+                    102,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "OB"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  56,
+                  120,
+                  56
+                ],
+                "name" : "OC",
+                "pt" : [
+                  120,
+                  56
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    48,
+                    98,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "OC"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    85,
+                    48,
+                    102,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "OC"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  88,
+                  120,
+                  88
+                ],
+                "name" : "OE",
+                "pt" : [
+                  120,
+                  88
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    80,
+                    97,
+                    94
+                  ],
+                  "size" : 8,
+                  "text" : "OE"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    86,
+                    80,
+                    102,
+                    94
+                  ],
+                  "size" : 8,
+                  "text" : "OE"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  72,
+                  120,
+                  72
+                ],
+                "name" : "OD",
+                "pt" : [
+                  120,
+                  72
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    64,
+                    98,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "OD"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    85,
+                    64,
+                    102,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "OD"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  104,
+                  120,
+                  104
+                ],
+                "name" : "OF",
+                "pt" : [
+                  120,
+                  104
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    96,
+                    97,
+                    110
+                  ],
+                  "size" : 8,
+                  "text" : "OF"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    86,
+                    96,
+                    102,
+                    110
+                  ],
+                  "size" : 8,
+                  "text" : "OF"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  120,
+                  120,
+                  120
+                ],
+                "name" : "OG",
+                "pt" : [
+                  120,
+                  120
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    112,
+                    99,
+                    126
+                  ],
+                  "size" : 8,
+                  "text" : "OG"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    84,
+                    112,
+                    102,
+                    126
+                  ],
+                  "size" : 8,
+                  "text" : "OG"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  24,
+                  120,
+                  24
+                ],
+                "name" : "OA",
+                "pt" : [
+                  120,
+                  24
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    16,
+                    99,
+                    30
+                  ],
+                  "size" : 8,
+                  "text" : "OA"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    84,
+                    16,
+                    102,
+                    30
+                  ],
+                  "size" : 8,
+                  "text" : "OA"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  112,
+                  136,
+                  120,
+                  136
+                ],
+                "name" : "RBON",
+                "pt" : [
+                  120,
+                  136
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    65,
+                    128,
+                    99,
+                    142
+                  ],
+                  "size" : 8,
+                  "text" : "RBON"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    79,
+                    128,
+                    113,
+                    142
+                  ],
+                  "size" : 8,
+                  "text" : "RBON"
+                }
+              }
+            ],
+            "source" : "library",
+            "width" : 120
+          },
+          "x" : 640,
+          "y" : 280
+        },
+        {
+          "id" : "1E50FC95-8FA0-4906-AD50-87E07086DD68",
+          "kind" : "vcc",
+          "name" : "inst4",
+          "x" : 544,
+          "y" : 416
+        },
+        {
+          "id" : "BB4BE0CA-95A7-411B-B3EB-5886DA9E7946",
+          "kind" : "output",
+          "location" : "PIN_AD21",
+          "name" : "hex4_0",
+          "x" : 900,
+          "y" : 288
+        },
+        {
+          "id" : "B6E39D4C-3753-4799-838B-477AB923E637",
+          "kind" : "output",
+          "location" : "PIN_AG22",
+          "name" : "hex4_1",
+          "x" : 900,
+          "y" : 312
+        },
+        {
+          "id" : "2BB35B0A-380B-4F50-A8CA-659A1F8610C6",
+          "kind" : "output",
+          "location" : "PIN_AE22",
+          "name" : "hex4_2",
+          "x" : 900,
+          "y" : 336
+        },
+        {
+          "id" : "2EF7C27B-F541-43E9-B739-12AFE80CB144",
+          "kind" : "output",
+          "location" : "PIN_AE23",
+          "name" : "hex4_3",
+          "x" : 900,
+          "y" : 360
+        },
+        {
+          "id" : "E481AB00-159E-4C5B-A11A-BA9A7D20E891",
+          "kind" : "output",
+          "location" : "PIN_AG23",
+          "name" : "hex4_4",
+          "x" : 900,
+          "y" : 384
+        },
+        {
+          "id" : "77A1698B-73E8-4EE9-A20B-3B1380D2BAC5",
+          "kind" : "output",
+          "location" : "PIN_AF23",
+          "name" : "hex4_5",
+          "x" : 900,
+          "y" : 408
+        },
+        {
+          "id" : "38A91217-D050-485D-B4A3-7477FF1F524E",
+          "kind" : "output",
+          "location" : "PIN_AH22",
+          "name" : "hex4_6",
+          "x" : 900,
+          "y" : 432
+        },
+        {
+          "id" : "3FA10A32-04A4-49D0-93C2-113B1A4DCB39",
+          "kind" : "macro",
+          "name" : "inst5",
+          "symbol" : {
+            "drawing" : [
+              {
+                "text" : {
+                  "_0" : {
+                    "bold" : false,
+                    "font" : "Arial",
+                    "invisible" : false,
+                    "rect" : [
+                      25,
+                      145,
+                      105,
+                      159
+                    ],
+                    "size" : 8,
+                    "text" : "BCD TO 7SEG"
+                  }
+                }
+              },
+              {
+                "line" : {
+                  "_0" : [
+                    16,
+                    16,
+                    104,
+                    16
+                  ]
+                }
+              },
+              {
+                "line" : {
+                  "_0" : [
+                    16,
+                    144,
+                    104,
+                    144
+                  ]
+                }
+              },
+              {
+                "line" : {
+                  "_0" : [
+                    16,
+                    144,
+                    16,
+                    16
+                  ]
+                }
+              },
+              {
+                "line" : {
+                  "_0" : [
+                    104,
+                    144,
+                    104,
+                    16
+                  ]
+                }
+              },
+              {
+                "circle" : {
+                  "_0" : [
+                    8,
+                    116,
+                    16,
+                    124
+                  ]
+                }
+              },
+              {
+                "circle" : {
+                  "_0" : [
+                    8,
+                    100,
+                    16,
+                    108
+                  ]
+                }
+              },
+              {
+                "circle" : {
+                  "_0" : [
+                    8,
+                    84,
+                    16,
+                    92
+                  ]
+                }
+              },
+              {
+                "circle" : {
+                  "_0" : [
+                    104,
+                    132,
+                    112,
+                    140
+                  ]
+                }
+              }
+            ],
+            "height" : 160,
+            "instanceText" : {
+              "bold" : false,
+              "font" : "Arial",
+              "invisible" : false,
+              "rect" : [
+                3,
+                149,
+                18,
+                159
+              ],
+              "size" : 6,
+              "text" : "inst"
+            },
+            "libraryPath" : [
+              "others",
+              "maxplus2"
+            ],
+            "name" : "7447",
+            "nameText" : {
+              "bold" : false,
+              "font" : "Arial",
+              "invisible" : false,
+              "rect" : [
+                44,
+                0,
+                77,
+                16
+              ],
+              "size" : 10,
+              "text" : "7447"
+            },
+            "ports" : [
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  88,
+                  8,
+                  88
+                ],
+                "name" : "LTN",
+                "pt" : [
+                  0,
+                  88
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    80,
+                    43,
+                    94
+                  ],
+                  "size" : 8,
+                  "text" : "LTN"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    80,
+                    43,
+                    94
+                  ],
+                  "size" : 8,
+                  "text" : "LTN"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  40,
+                  16,
+                  40
+                ],
+                "name" : "B",
+                "pt" : [
+                  0,
+                  40
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    32,
+                    29,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "B"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    32,
+                    29,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "B"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  56,
+                  16,
+                  56
+                ],
+                "name" : "C",
+                "pt" : [
+                  0,
+                  56
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    48,
+                    29,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "C"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    48,
+                    29,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "C"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  72,
+                  16,
+                  72
+                ],
+                "name" : "D",
+                "pt" : [
+                  0,
+                  72
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    64,
+                    29,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "D"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    64,
+                    29,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "D"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  104,
+                  8,
+                  104
+                ],
+                "name" : "RBIN",
+                "pt" : [
+                  0,
+                  104
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    96,
+                    48,
+                    110
+                  ],
+                  "size" : 8,
+                  "text" : "RBIN"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    96,
+                    48,
+                    110
+                  ],
+                  "size" : 8,
+                  "text" : "RBIN"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  120,
+                  8,
+                  120
+                ],
+                "name" : "BIN",
+                "pt" : [
+                  0,
+                  120
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    112,
+                    39,
+                    126
+                  ],
+                  "size" : 8,
+                  "text" : "BIN"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    112,
+                    39,
+                    126
+                  ],
+                  "size" : 8,
+                  "text" : "BIN"
+                }
+              },
+              {
+                "isOutput" : false,
+                "line" : [
+                  0,
+                  24,
+                  16,
+                  24
+                ],
+                "name" : "A",
+                "pt" : [
+                  0,
+                  24
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    16,
+                    30,
+                    30
+                  ],
+                  "size" : 8,
+                  "text" : "A"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    21,
+                    16,
+                    30,
+                    30
+                  ],
+                  "size" : 8,
+                  "text" : "A"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  40,
+                  120,
+                  40
+                ],
+                "name" : "OB",
+                "pt" : [
+                  120,
+                  40
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    32,
+                    98,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "OB"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    85,
+                    32,
+                    102,
+                    46
+                  ],
+                  "size" : 8,
+                  "text" : "OB"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  56,
+                  120,
+                  56
+                ],
+                "name" : "OC",
+                "pt" : [
+                  120,
+                  56
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    48,
+                    98,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "OC"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    85,
+                    48,
+                    102,
+                    62
+                  ],
+                  "size" : 8,
+                  "text" : "OC"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  88,
+                  120,
+                  88
+                ],
+                "name" : "OE",
+                "pt" : [
+                  120,
+                  88
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    80,
+                    97,
+                    94
+                  ],
+                  "size" : 8,
+                  "text" : "OE"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    86,
+                    80,
+                    102,
+                    94
+                  ],
+                  "size" : 8,
+                  "text" : "OE"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  72,
+                  120,
+                  72
+                ],
+                "name" : "OD",
+                "pt" : [
+                  120,
+                  72
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    64,
+                    98,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "OD"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    85,
+                    64,
+                    102,
+                    78
+                  ],
+                  "size" : 8,
+                  "text" : "OD"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  104,
+                  120,
+                  104
+                ],
+                "name" : "OF",
+                "pt" : [
+                  120,
+                  104
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    96,
+                    97,
+                    110
+                  ],
+                  "size" : 8,
+                  "text" : "OF"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    86,
+                    96,
+                    102,
+                    110
+                  ],
+                  "size" : 8,
+                  "text" : "OF"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  120,
+                  120,
+                  120
+                ],
+                "name" : "OG",
+                "pt" : [
+                  120,
+                  120
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    112,
+                    99,
+                    126
+                  ],
+                  "size" : 8,
+                  "text" : "OG"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    84,
+                    112,
+                    102,
+                    126
+                  ],
+                  "size" : 8,
+                  "text" : "OG"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  104,
+                  24,
+                  120,
+                  24
+                ],
+                "name" : "OA",
+                "pt" : [
+                  120,
+                  24
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    81,
+                    16,
+                    99,
+                    30
+                  ],
+                  "size" : 8,
+                  "text" : "OA"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    84,
+                    16,
+                    102,
+                    30
+                  ],
+                  "size" : 8,
+                  "text" : "OA"
+                }
+              },
+              {
+                "isOutput" : true,
+                "line" : [
+                  112,
+                  136,
+                  120,
+                  136
+                ],
+                "name" : "RBON",
+                "pt" : [
+                  120,
+                  136
+                ],
+                "text1" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    65,
+                    128,
+                    99,
+                    142
+                  ],
+                  "size" : 8,
+                  "text" : "RBON"
+                },
+                "text2" : {
+                  "bold" : false,
+                  "font" : "Arial",
+                  "invisible" : false,
+                  "rect" : [
+                    79,
+                    128,
+                    113,
+                    142
+                  ],
+                  "size" : 8,
+                  "text" : "RBON"
+                }
+              }
+            ],
+            "source" : "library",
+            "width" : 120
+          },
+          "x" : 640,
+          "y" : 520
+        },
+        {
+          "id" : "A9065B71-78CC-4A02-AC0E-860A39CF45D0",
+          "kind" : "vcc",
+          "name" : "inst6",
+          "x" : 544,
+          "y" : 656
+        },
+        {
+          "id" : "922C15DF-8D02-4E64-B70B-793C69AA3D57",
+          "kind" : "output",
+          "location" : "PIN_W17",
+          "name" : "hex0_0",
+          "x" : 900,
+          "y" : 528
+        },
+        {
+          "id" : "07314C81-9D3A-4AFB-B559-D625419AB7EA",
+          "kind" : "output",
+          "location" : "PIN_V18",
+          "name" : "hex0_1",
+          "x" : 900,
+          "y" : 552
+        },
+        {
+          "id" : "4FBECFB4-99F9-4E6B-87E9-ADD6B7299030",
+          "kind" : "output",
+          "location" : "PIN_AG17",
+          "name" : "hex0_2",
+          "x" : 900,
+          "y" : 576
+        },
+        {
+          "id" : "5282B7D8-8599-4A80-B937-7B5CC937A965",
+          "kind" : "output",
+          "location" : "PIN_AG16",
+          "name" : "hex0_3",
+          "x" : 900,
+          "y" : 600
+        },
+        {
+          "id" : "E85C1611-7795-4C49-BF03-105005D6913F",
+          "kind" : "output",
+          "location" : "PIN_AH17",
+          "name" : "hex0_4",
+          "x" : 900,
+          "y" : 624
+        },
+        {
+          "id" : "8A326D3C-BE7C-4C87-8756-0D108992C772",
+          "kind" : "output",
+          "location" : "PIN_AG18",
+          "name" : "hex0_5",
+          "x" : 900,
+          "y" : 648
+        },
+        {
+          "id" : "5FDDFBA4-77FC-43F0-A560-CDA17803FD7A",
+          "kind" : "output",
+          "location" : "PIN_AH18",
+          "name" : "hex0_6",
+          "x" : 900,
+          "y" : 672
+        },
+        {
+          "id" : "8A016184-43EA-4A51-A8F2-DCDB543CDAFD",
+          "kind" : "output",
+          "location" : "PIN_AA24",
+          "name" : "s0",
+          "x" : 900,
+          "y" : 856
+        },
+        {
+          "id" : "22E5A672-1C63-447C-9F66-791D57CD13F8",
+          "kind" : "output",
+          "location" : "PIN_AB23",
+          "name" : "s1",
+          "x" : 900,
+          "y" : 832
+        },
+        {
+          "id" : "96E587D9-4D3F-4380-8058-73A664C7BB2A",
+          "kind" : "output",
+          "location" : "PIN_AC23",
+          "name" : "s2",
+          "x" : 900,
+          "y" : 808
+        },
+        {
+          "id" : "DEEEFA96-E65C-447B-97E2-53D0C8DB9A99",
+          "kind" : "output",
+          "location" : "PIN_AD24",
+          "name" : "s3",
+          "x" : 900,
+          "y" : 784
+        },
+        {
+          "id" : "121AA548-B635-4672-800E-23A264B01397",
+          "kind" : "output",
+          "location" : "PIN_AG25",
+          "name" : "cout",
+          "x" : 900,
+          "y" : 760
+        }
+      ],
+      "device" : "5CSXFC6D6F31C6",
+      "expected" : {
+        "07314C81-9D3A-4AFB-B559-D625419AB7EA" : "3, 5, 7, 10-13, 20-23, 26, 28, 30, 37, 39-42, 45, 47, 50, 52, 55-58, 60, 70-73, 75, 79-82, 86, 88-91, 100, 102, 105, 107, 109-110, 112-113, 115-116, 118, 120, 123, 125, 130, 132, 139-143, 146-150, 157, 159-162, 170, 172-173, 175-178, 180-181, 183, 191-193, 195, 200, 202, 206-211, 215, 217, 222, 227, 229-230, 232, 236, 238, 240-241, 243, 245, 249, 251-252, 254, 260-263, 266, 268, 270, 275, 277, 279, 282-285, 290, 292, 295-298, 300, 309, 311-314, 317, 319-322, 326, 328-331, 342-345, 347, 351-353, 355-356, 358, 360, 363, 365, 372, 374, 377, 379, 381-382, 386-390, 397, 399, 402, 404, 411-418, 420-421, 423, 431-434, 442, 444-445, 447-451, 455, 457, 462, 464-465, 467, 472, 474, 478-481, 483, 485, 489, 491-492, 494, 499, 501-502, 504, 508, 510",
+        "121AA548-B635-4672-800E-23A264B01397" : "1, 33, 35, 62, 65, 67, 69, 92, 94, 97, 99, 101, 103, 122, 124, 126, 129, 131, 133, 135, 137, 152, 154, 156, 158, 161, 163, 165, 167, 169, 171, 182, 184, 186, 188, 190, 193, 195, 197, 199, 201, 203, 205, 212, 214, 216, 218, 220, 222, 225, 227, 229, 231, 233, 235, 237, 239, 242, 244, 246, 248, 250, 252, 254, 257, 259, 261, 263, 265, 267, 269, 271-274, 276, 278, 280, 282, 284, 286, 289, 291, 293, 295, 297, 299, 301-308, 310, 312, 314, 316, 318, 321, 323, 325, 327, 329, 331-342, 344, 346, 348, 350, 353, 355, 357, 359, 361-376, 378, 380, 382, 385, 387, 389, 391-410, 412, 414, 417, 419, 421-444, 446, 449, 451-478, 481-511",
+        "158508AD-2593-4BD2-9F2E-6C7DEDD2C4F7" : "32-127, 224-255, 320-383, 480-511",
+        "22E5A672-1C63-447C-9F66-791D57CD13F8" : "3-6, 11-14, 19-22, 27-30, 34, 36-37, 39, 42, 44-45, 47, 50, 52-53, 55, 58, 60-61, 63-66, 71-74, 79-82, 87-90, 95-97, 99, 102, 104-105, 107, 110, 112-113, 115, 118, 120-121, 123, 126, 131-134, 139-142, 147-150, 155-158, 162, 164-165, 167, 170, 172-173, 175, 178, 180-181, 183, 186, 188-189, 191-194, 199-202, 207-210, 215-218, 223-225, 227, 230, 232-233, 235, 238, 240-241, 243, 246, 248-249, 251, 254, 259-262, 267-270, 275-278, 283-286, 290, 292-293, 295, 298, 300-301, 303, 306, 308-309, 311, 314, 316-317, 319-322, 327-330, 335-338, 343-346, 351-353, 355, 358, 360-361, 363, 366, 368-369, 371, 374, 376-377, 379, 382, 387-390, 395-398, 403-406, 411-414, 418, 420-421, 423, 426, 428-429, 431, 434, 436-437, 439, 442, 444-445, 447-450, 455-458, 463-466, 471-474, 479-481, 483, 486, 488-489, 491, 494, 496-497, 499, 502, 504-505, 507, 510",
+        "2BB35B0A-380B-4F50-A8CA-659A1F8610C6" : "4-5, 20-21, 24-31, 36-37, 52-53, 56-63, 68-69, 84-85, 88-95, 100-101, 116-117, 120-127, 132-133, 148-149, 152-159, 164-165, 180-181, 184-191, 196-197, 212-213, 216-223, 228-229, 244-245, 248-255, 260-261, 276-277, 280-287, 292-293, 308-309, 312-319, 324-325, 340-341, 344-351, 356-357, 372-373, 376-383, 388-389, 404-405, 408-415, 420-421, 436-437, 440-447, 452-453, 468-469, 472-479, 484-485, 500-501, 504-511",
+        "2C44B128-0E55-4753-86BE-0A22AFCE33FE" : "32-63, 96-191, 224-255, 288-319, 352-447, 480-511",
+        "2EF7C27B-F541-43E9-B739-12AFE80CB144" : "2-3, 8-9, 14-15, 18-19, 24-25, 30-31, 34-35, 40-41, 46-47, 50-51, 56-57, 62-63, 66-67, 72-73, 78-79, 82-83, 88-89, 94-95, 98-99, 104-105, 110-111, 114-115, 120-121, 126-127, 130-131, 136-137, 142-143, 146-147, 152-153, 158-159, 162-163, 168-169, 174-175, 178-179, 184-185, 190-191, 194-195, 200-201, 206-207, 210-211, 216-217, 222-223, 226-227, 232-233, 238-239, 242-243, 248-249, 254-255, 258-259, 264-265, 270-271, 274-275, 280-281, 286-287, 290-291, 296-297, 302-303, 306-307, 312-313, 318-319, 322-323, 328-329, 334-335, 338-339, 344-345, 350-351, 354-355, 360-361, 366-367, 370-371, 376-377, 382-383, 386-387, 392-393, 398-399, 402-403, 408-409, 414-415, 418-419, 424-425, 430-431, 434-435, 440-441, 446-447, 450-451, 456-457, 462-463, 466-467, 472-473, 478-479, 482-483, 488-489, 494-495, 498-499, 504-505, 510-511",
+        "38A91217-D050-485D-B4A3-7477FF1F524E" : "0-3, 14-15, 30-35, 46-47, 62-67, 78-79, 94-99, 110-111, 126-131, 142-143, 158-163, 174-175, 190-195, 206-207, 222-227, 238-239, 254-259, 270-271, 286-291, 302-303, 318-323, 334-335, 350-355, 366-367, 382-387, 398-399, 414-419, 430-431, 446-451, 462-463, 478-483, 494-495, 510-511",
+        "4E493596-4017-408D-97B8-5AC88B8C154D" : "64-95, 320-351, 384-511",
+        "4FBECFB4-99F9-4E6B-87E9-ADD6B7299030" : "3-5, 7, 9, 13, 20, 24, 26, 28-30, 34, 37, 39, 41, 43, 47, 50, 54, 56, 58, 60, 63-65, 71, 73, 75, 77, 80-81, 84, 86, 88, 90, 99, 105, 107, 109-111, 114-116, 118, 120, 126, 133, 139-141, 143-146, 148-150, 156, 167, 170, 173-180, 183, 186, 200-201, 204, 206-211, 213, 216-217, 230, 234-236, 238, 240-241, 243, 245-247, 251, 260, 264, 266, 268-270, 275-277, 279, 281, 285, 290, 294, 296, 298, 300, 303, 306, 309, 311, 313, 315, 319-321, 324, 326, 328, 330, 336-337, 343, 345, 347, 349, 354-356, 358, 360, 366, 371, 377, 379, 381-386, 388-390, 396, 405, 411-413, 415-420, 423, 426, 439, 442, 445-451, 453, 456-457, 472-473, 476, 478-481, 483, 485-487, 491, 502, 506-508, 510",
+        "5282B7D8-8599-4A80-B937-7B5CC937A965" : "2-3, 8-9, 14-15, 18-19, 24-25, 30-33, 37-38, 43-44, 48-49, 53-54, 59-60, 67-68, 71, 74, 77-78, 83-84, 87, 90, 93-94, 98, 101, 104-105, 108, 111, 114, 117, 120-121, 124, 127-129, 134-135, 138-139, 144-145, 150-151, 154-155, 163-164, 168-169, 173-174, 179-180, 184-185, 189-190, 194, 197-198, 203-204, 207, 210, 213-214, 219-220, 223-225, 228, 231, 234, 237, 240-241, 244, 247, 250, 253, 258-259, 264-265, 270-271, 274-275, 280-281, 286-289, 293-294, 299-300, 304-305, 309-310, 315-316, 323-324, 327, 330, 333-334, 339-340, 343, 346, 349-350, 354, 357, 360-361, 364, 367, 370, 373, 376-377, 380, 383-385, 390-391, 394-395, 400-401, 406-407, 410-411, 419-420, 424-425, 429-430, 435-436, 440-441, 445-446, 450, 453-454, 459-460, 463, 466, 469-470, 475-476, 479-481, 484, 487, 490, 493, 496-497, 500, 503, 506, 509",
+        "537A4DB5-3584-4002-B678-0B5555CEEFB4" : "0-63, 224-255, 480-511",
+        "5FDDFBA4-77FC-43F0-A560-CDA17803FD7A" : "0-3, 14, 19, 30-33, 35, 37, 44, 53, 60, 62, 67, 69, 71, 74, 87, 90, 92, 94, 101, 103-105, 120-122, 124, 134-135, 137, 139, 150, 152, 154-155, 164, 169, 171, 173, 180, 182, 184, 189, 194, 203, 205, 207, 210, 212, 214, 223-225, 237, 239-242, 244, 259, 270-275, 286, 293, 300, 302, 304-305, 307, 309, 316, 327, 330, 332, 334, 339, 341, 343, 346, 360-362, 364, 373, 375-377, 390, 392, 394-395, 406-407, 409, 411, 420, 422, 424, 429, 436, 441, 443, 445, 450, 452, 454, 463, 466, 475, 477, 479-482, 484, 496-497, 509, 511",
+        "77A1698B-73E8-4EE9-A20B-3B1380D2BAC5" : "2-7, 14-15, 20-23, 30-31, 34-39, 46-47, 52-55, 62-63, 66-71, 78-79, 84-87, 94-95, 98-103, 110-111, 116-119, 126-127, 130-135, 142-143, 148-151, 158-159, 162-167, 174-175, 180-183, 190-191, 194-199, 206-207, 212-215, 222-223, 226-231, 238-239, 244-247, 254-255, 258-263, 270-271, 276-279, 286-287, 290-295, 302-303, 308-311, 318-319, 322-327, 334-335, 340-343, 350-351, 354-359, 366-367, 372-375, 382-383, 386-391, 398-399, 404-407, 414-415, 418-423, 430-431, 436-439, 446-447, 450-455, 462-463, 468-471, 478-479, 482-487, 494-495, 500-503, 510-511",
+        "8A016184-43EA-4A51-A8F2-DCDB543CDAFD" : "2-3, 6-7, 10-11, 14-15, 18-19, 22-23, 26-27, 30-33, 36-37, 40-41, 44-45, 48-49, 52-53, 56-57, 60-61, 66-67, 70-71, 74-75, 78-79, 82-83, 86-87, 90-91, 94-97, 100-101, 104-105, 108-109, 112-113, 116-117, 120-121, 124-125, 130-131, 134-135, 138-139, 142-143, 146-147, 150-151, 154-155, 158-161, 164-165, 168-169, 172-173, 176-177, 180-181, 184-185, 188-189, 194-195, 198-199, 202-203, 206-207, 210-211, 214-215, 218-219, 222-225, 228-229, 232-233, 236-237, 240-241, 244-245, 248-249, 252-253, 258-259, 262-263, 266-267, 270-271, 274-275, 278-279, 282-283, 286-289, 292-293, 296-297, 300-301, 304-305, 308-309, 312-313, 316-317, 322-323, 326-327, 330-331, 334-335, 338-339, 342-343, 346-347, 350-353, 356-357, 360-361, 364-365, 368-369, 372-373, 376-377, 380-381, 386-387, 390-391, 394-395, 398-399, 402-403, 406-407, 410-411, 414-417, 420-421, 424-425, 428-429, 432-433, 436-437, 440-441, 444-445, 450-451, 454-455, 458-459, 462-463, 466-467, 470-471, 474-475, 478-481, 484-485, 488-489, 492-493, 496-497, 500-501, 504-505, 508-509",
+        "8A326D3C-BE7C-4C87-8756-0D108992C772" : "2-4, 6, 11, 13-14, 19-20, 22, 27, 29-34, 36-37, 44-45, 47, 50, 52-53, 60-61, 63-67, 71, 74, 79-82, 87, 90, 94-97, 99, 101, 104-105, 110, 112-113, 115, 120-121, 124, 126, 131, 133-135, 139-140, 142, 147, 149-150, 154-156, 158, 164-165, 167, 169-170, 172-173, 180-181, 183-184, 186, 188-189, 194, 199-203, 207, 210, 214-218, 223-225, 230, 232-233, 235, 237, 240-241, 244, 246, 248-249, 251, 259-260, 262, 267, 269-271, 274-276, 278, 283, 285-286, 290, 292-293, 300-301, 303-306, 308-309, 316-317, 319-322, 327, 330, 334-339, 343, 346, 351-353, 355, 360-361, 364, 366, 368-369, 371, 373, 376-377, 382, 387, 389-390, 394-396, 398, 403, 405-407, 411-412, 414, 420-421, 423-424, 426, 428-429, 436-437, 439, 441-442, 444-445, 450, 454-458, 463, 466, 471-475, 479-481, 484, 486, 488-489, 491, 496-497, 502, 504-505, 507, 509",
+        "922C15DF-8D02-4E64-B70B-793C69AA3D57" : "2-3, 5, 8-9, 11-13, 20-22, 24-25, 28, 30-33, 37-39, 42-43, 45, 47, 50, 52, 54-55, 58-60, 67-68, 71-73, 77, 79-82, 84, 88-90, 93-94, 98, 101-102, 105, 107, 110-115, 118, 120, 123-124, 127-129, 132, 135, 139-142, 144-145, 147-150, 154, 157, 162-163, 169-170, 172-175, 178-181, 183-184, 190-193, 197, 200, 202-204, 207-210, 213-215, 217, 220, 227, 230-232, 234, 237-238, 240-241, 243-244, 247, 249-251, 254, 260-262, 264-265, 268, 270-271, 274-275, 277, 280-281, 283-285, 290, 292, 294-295, 298-300, 304-305, 309-311, 314-315, 317, 319-322, 324, 328-330, 333-334, 339-340, 343-345, 349, 351-355, 358, 360, 363-364, 367, 370, 373-374, 377, 379, 382-385, 387-390, 394, 397, 400-401, 404, 407, 411-414, 418-421, 423-424, 430-431, 434-435, 441-442, 444-450, 453-455, 457, 460, 464-465, 469, 472, 474-476, 479-481, 483-484, 487, 489-491, 494, 499, 502-504, 506, 509-510",
+        "96E587D9-4D3F-4380-8058-73A664C7BB2A" : "3, 5, 7-10, 12, 14, 19, 21, 23-26, 28, 30, 37-44, 53-60, 68, 70-75, 77, 84, 86-91, 93, 98, 100, 102, 104-105, 107, 109, 111, 114, 116, 118, 120-121, 123, 125, 127-130, 132, 134, 139, 141, 143-146, 148, 150, 155, 157, 159-164, 173-180, 189-195, 197, 204, 206-211, 213, 220, 222-225, 227, 229, 231, 234, 236, 238, 240-241, 243, 245, 247, 250, 252, 254, 259, 261, 263-266, 268, 270, 275, 277, 279-282, 284, 286, 293-300, 309-316, 324, 326-331, 333, 340, 342-347, 349, 354, 356, 358, 360-361, 363, 365, 367, 370, 372, 374, 376-377, 379, 381, 383-386, 388, 390, 395, 397, 399-402, 404, 406, 411, 413, 415-420, 429-436, 445-451, 453, 460, 462-467, 469, 476, 478-481, 483, 485, 487, 490, 492, 494, 496-497, 499, 501, 503, 506, 508, 510",
+        "9976C6ED-728F-4139-A1BE-9A6EA6A54BD6" : "160-223, 320-383, 416-511",
+        "B6E39D4C-3753-4799-838B-477AB923E637" : "10-13, 20-23, 26-31, 42-45, 52-55, 58-63, 74-77, 84-87, 90-95, 106-109, 116-119, 122-127, 138-141, 148-151, 154-159, 170-173, 180-183, 186-191, 202-205, 212-215, 218-223, 234-237, 244-247, 250-255, 266-269, 276-279, 282-287, 298-301, 308-311, 314-319, 330-333, 340-343, 346-351, 362-365, 372-375, 378-383, 394-397, 404-407, 410-415, 426-429, 436-439, 442-447, 458-461, 468-471, 474-479, 490-493, 500-503, 506-511",
+        "BB4BE0CA-95A7-411B-B3EB-5886DA9E7946" : "2-3, 8-9, 12-13, 20-25, 28-31, 34-35, 40-41, 44-45, 52-57, 60-63, 66-67, 72-73, 76-77, 84-89, 92-95, 98-99, 104-105, 108-109, 116-121, 124-127, 130-131, 136-137, 140-141, 148-153, 156-159, 162-163, 168-169, 172-173, 180-185, 188-191, 194-195, 200-201, 204-205, 212-217, 220-223, 226-227, 232-233, 236-237, 244-249, 252-255, 258-259, 264-265, 268-269, 276-281, 284-287, 290-291, 296-297, 300-301, 308-313, 316-319, 322-323, 328-329, 332-333, 340-345, 348-351, 354-355, 360-361, 364-365, 372-377, 380-383, 386-387, 392-393, 396-397, 404-409, 412-415, 418-419, 424-425, 428-429, 436-441, 444-447, 450-451, 456-457, 460-461, 468-473, 476-479, 482-483, 488-489, 492-493, 500-505, 508-511",
+        "C870ABE0-5DA1-474B-919E-D52A17457D31" : "32-63, 128-159, 192-223, 320-415, 448-511",
+        "D8CE1B43-01BF-4B89-8435-0E95415945A4" : "32-63, 128-159, 224-255, 288-319, 384-415, 480-511",
+        "DEEEFA96-E65C-447B-97E2-53D0C8DB9A99" : "3, 5, 7, 9, 11, 13, 15-18, 20, 22, 24, 26, 28, 30, 37, 39, 41, 43, 45-52, 54, 56, 58, 60, 71, 73, 75-86, 88, 90, 105-120, 136, 138-151, 153, 166, 168, 170, 172-181, 183, 185, 187, 196, 198, 200, 202, 204, 206-211, 213, 215, 217, 219, 221, 226, 228, 230, 232, 234, 236, 238, 240-241, 243, 245, 247, 249, 251, 253, 255-258, 260, 262, 264, 266, 268, 270, 275, 277, 279, 281, 283, 285, 287-292, 294, 296, 298, 300, 309, 311, 313, 315, 317-326, 328, 330, 343, 345, 347-360, 377-391, 393, 408, 410-421, 423, 425, 427, 438, 440, 442, 444-451, 453, 455, 457, 459, 461, 468, 470, 472, 474, 476, 478-481, 483, 485, 487, 489, 491, 493, 495, 498, 500, 502, 504, 506, 508, 510",
+        "E481AB00-159E-4C5B-A11A-BA9A7D20E891" : "2-3, 6-11, 14-15, 18-19, 22-27, 30-31, 34-35, 38-43, 46-47, 50-51, 54-59, 62-63, 66-67, 70-75, 78-79, 82-83, 86-91, 94-95, 98-99, 102-107, 110-111, 114-115, 118-123, 126-127, 130-131, 134-139, 142-143, 146-147, 150-155, 158-159, 162-163, 166-171, 174-175, 178-179, 182-187, 190-191, 194-195, 198-203, 206-207, 210-211, 214-219, 222-223, 226-227, 230-235, 238-239, 242-243, 246-251, 254-255, 258-259, 262-267, 270-271, 274-275, 278-283, 286-287, 290-291, 294-299, 302-303, 306-307, 310-315, 318-319, 322-323, 326-331, 334-335, 338-339, 342-347, 350-351, 354-355, 358-363, 366-367, 370-371, 374-379, 382-383, 386-387, 390-395, 398-399, 402-403, 406-411, 414-415, 418-419, 422-427, 430-431, 434-435, 438-443, 446-447, 450-451, 454-459, 462-463, 466-467, 470-475, 478-479, 482-483, 486-491, 494-495, 498-499, 502-507, 510-511",
+        "E85C1611-7795-4C49-BF03-105005D6913F" : "2-3, 6-11, 14-15, 18-19, 22-27, 30-33, 36-38, 40-41, 43-45, 48-49, 52-54, 56-57, 59-61, 66-68, 70-71, 74-75, 77-79, 82-84, 86-87, 90-91, 93-98, 100-101, 104-105, 108-109, 111-114, 116-117, 120-121, 124-125, 127-131, 134-135, 138-139, 142-147, 150-151, 154-155, 158-161, 163-165, 168-169, 172-174, 176-177, 179-181, 184-185, 188-190, 194-195, 197-199, 202-204, 206-207, 210-211, 213-215, 218-220, 222-225, 228-229, 231-234, 236-237, 240-241, 244-245, 247-250, 252-253, 258-259, 262-267, 270-271, 274-275, 278-283, 286-289, 292-294, 296-297, 299-301, 304-305, 308-310, 312-313, 315-317, 322-324, 326-327, 330-331, 333-335, 338-340, 342-343, 346-347, 349-354, 356-357, 360-361, 364-365, 367-370, 372-373, 376-377, 380-381, 383-387, 390-391, 394-395, 398-403, 406-407, 410-411, 414-417, 419-421, 424-425, 428-430, 432-433, 435-437, 440-441, 444-446, 450-451, 453-455, 458-460, 462-463, 466-467, 469-471, 474-476, 478-481, 484-485, 487-490, 492-493, 496-497, 500-501, 503-506, 508-509"
+      },
+      "id" : "D55BA517-492B-4868-95A3-A5A9371AC282",
+      "inputOrder" : [
+        "532FD183-2B2B-4B7A-8F9B-D72D1C3D7B48",
+        "A72985F8-0224-438E-A3B4-BFBE0A06950C",
+        "D1A7A757-F9CB-4DBD-AA9D-76DAEF4ED109",
+        "4777CFDE-871C-4A30-8FB5-D9445AE83A88",
+        "9BAD196B-7CDF-4036-A7AE-BF7311155A37",
+        "5098EC4F-16E2-4494-A173-A48E432241C5",
+        "53DBFF5E-D5EC-4643-834F-567AFF688E5C",
+        "2E45E063-75EA-445D-8596-61A8294A17EB",
+        "33834AC1-9EF8-431A-B474-85EFB7D9D91A"
+      ],
+      "labels" : {
+        "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824#1" : "a1",
+        "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824#10" : "hex5_3",
+        "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824#11" : "hex5_5",
+        "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824#12" : "hex5_6",
+        "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824#13" : "hex5_0",
+        "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824#2" : "a2",
+        "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824#3" : "a3",
+        "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824#6" : "a0",
+        "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824#7" : "hex5_1",
+        "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824#8" : "hex5_2",
+        "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824#9" : "hex5_4",
+        "3FA10A32-04A4-49D0-93C2-113B1A4DCB39#1" : "s1",
+        "3FA10A32-04A4-49D0-93C2-113B1A4DCB39#10" : "hex0_3",
+        "3FA10A32-04A4-49D0-93C2-113B1A4DCB39#11" : "hex0_5",
+        "3FA10A32-04A4-49D0-93C2-113B1A4DCB39#12" : "hex0_6",
+        "3FA10A32-04A4-49D0-93C2-113B1A4DCB39#13" : "hex0_0",
+        "3FA10A32-04A4-49D0-93C2-113B1A4DCB39#2" : "s2",
+        "3FA10A32-04A4-49D0-93C2-113B1A4DCB39#3" : "s3",
+        "3FA10A32-04A4-49D0-93C2-113B1A4DCB39#6" : "s0",
+        "3FA10A32-04A4-49D0-93C2-113B1A4DCB39#7" : "hex0_1",
+        "3FA10A32-04A4-49D0-93C2-113B1A4DCB39#8" : "hex0_2",
+        "3FA10A32-04A4-49D0-93C2-113B1A4DCB39#9" : "hex0_4",
+        "61F67193-9C81-47C7-AB99-E2F469B87088#1" : "b1",
+        "61F67193-9C81-47C7-AB99-E2F469B87088#10" : "hex4_3",
+        "61F67193-9C81-47C7-AB99-E2F469B87088#11" : "hex4_5",
+        "61F67193-9C81-47C7-AB99-E2F469B87088#12" : "hex4_6",
+        "61F67193-9C81-47C7-AB99-E2F469B87088#13" : "hex4_0",
+        "61F67193-9C81-47C7-AB99-E2F469B87088#2" : "b2",
+        "61F67193-9C81-47C7-AB99-E2F469B87088#3" : "b3",
+        "61F67193-9C81-47C7-AB99-E2F469B87088#6" : "b0",
+        "61F67193-9C81-47C7-AB99-E2F469B87088#7" : "hex4_1",
+        "61F67193-9C81-47C7-AB99-E2F469B87088#8" : "hex4_2",
+        "61F67193-9C81-47C7-AB99-E2F469B87088#9" : "hex4_4",
+        "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4#0" : "a3",
+        "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4#1" : "a2",
+        "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4#10" : "s3",
+        "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4#11" : "s2",
+        "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4#12" : "s1",
+        "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4#13" : "s0",
+        "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4#2" : "a1",
+        "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4#3" : "a0",
+        "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4#4" : "b3",
+        "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4#5" : "b2",
+        "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4#6" : "b1",
+        "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4#7" : "b0",
+        "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4#8" : "m",
+        "83C0AD28-5CC4-4F9E-AF14-421CCA9229B4#9" : "cout"
+      },
+      "name" : "AddSub4Display",
+      "wires" : [
+        {
+          "a" : {
+            "comp" : "CA8FD3A1-AE2D-4550-BF1A-482819D3A3DC",
+            "port" : 0
+          },
+          "b" : {
+            "comp" : "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824",
+            "port" : 0
+          },
+          "id" : "F86EDCEC-5EB7-4107-B80F-8A0CE1F250C5"
+        },
+        {
+          "a" : {
+            "comp" : "CA8FD3A1-AE2D-4550-BF1A-482819D3A3DC",
+            "port" : 0
+          },
+          "b" : {
+            "comp" : "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824",
+            "port" : 4
+          },
+          "id" : "6846C01B-EDFE-440C-96C8-F01AAD978CFD"
+        },
+        {
+          "a" : {
+            "comp" : "CA8FD3A1-AE2D-4550-BF1A-482819D3A3DC",
+            "port" : 0
+          },
+          "b" : {
+            "comp" : "15C4B3EE-4074-4B0C-BD9A-AC9E8C5A7824",
+            "port" : 5
+          },
+          "id" : "13855F8F-3386-4900-9BE3-C47FFFBF9CDA"
+        },
+        {
+          "a" : {
+            "comp" : "1E50FC95-8FA0-4906-AD50-87E07086DD68",
+            "port" : 0
+          },
+          "b" : {
+            "comp" : "61F67193-9C81-47C7-AB99-E2F469B87088",
+            "port" : 0
+          },
+          "id" : "191C93C8-092D-4877-BAA9-36C73681703F"
+        },
+        {
+          "a" : {
+            "comp" : "1E50FC95-8FA0-4906-AD50-87E07086DD68",
+            "port" : 0
+          },
+          "b" : {
+            "comp" : "61F67193-9C81-47C7-AB99-E2F469B87088",
+            "port" : 4
+          },
+          "id" : "50317A5E-B043-43D4-B3A0-4DA94F4EA3FD"
+        },
+        {
+          "a" : {
+            "comp" : "1E50FC95-8FA0-4906-AD50-87E07086DD68",
+            "port" : 0
+          },
+          "b" : {
+            "comp" : "61F67193-9C81-47C7-AB99-E2F469B87088",
+            "port" : 5
+          },
+          "id" : "A941CAC2-2717-426D-BDCB-E7942E8922E9"
+        },
+        {
+          "a" : {
+            "comp" : "A9065B71-78CC-4A02-AC0E-860A39CF45D0",
+            "port" : 0
+          },
+          "b" : {
+            "comp" : "3FA10A32-04A4-49D0-93C2-113B1A4DCB39",
+            "port" : 0
+          },
+          "id" : "650BBEFE-791E-427F-89CA-E14FFE59A0E2"
+        },
+        {
+          "a" : {
+            "comp" : "A9065B71-78CC-4A02-AC0E-860A39CF45D0",
+            "port" : 0
+          },
+          "b" : {
+            "comp" : "3FA10A32-04A4-49D0-93C2-113B1A4DCB39",
+            "port" : 4
+          },
+          "id" : "0546D908-854C-41C0-9D20-AC67A1A7F048"
+        },
+        {
+          "a" : {
+            "comp" : "A9065B71-78CC-4A02-AC0E-860A39CF45D0",
+            "port" : 0
+          },
+          "b" : {
+            "comp" : "3FA10A32-04A4-49D0-93C2-113B1A4DCB39",
+            "port" : 5
+          },
+          "id" : "7AEE53DE-4059-4954-96B8-35D6A87CC0AD"
+        }
+      ]
+    }
+  ],
+  "topLevelEntity" : "AddSub4Display"
+}

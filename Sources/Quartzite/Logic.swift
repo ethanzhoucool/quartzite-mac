@@ -190,14 +190,16 @@ enum Minimizer {
     }
 
     /// Search limits for functions of many inputs. Above `greedyAbovePrimes` prime implicants
-    /// the cover is chosen greedily; otherwise branch and bound stops after `nodeLimit` nodes.
+    /// the cover is chosen greedily; otherwise Petrick's method gives up beyond `petrickLimit`
+    /// products and branch and bound stops after `nodeLimit` nodes.
     struct Limits {
         var nodeLimit: Int
         var greedyAbovePrimes: Int
+        var petrickLimit: Int
     }
 
     /// Limits for outputs that depend on 9 to 12 inputs (deterministic: node counts, no clock).
-    static let wideLimits = Limits(nodeLimit: 20_000, greedyAbovePrimes: 1500)
+    static let wideLimits = Limits(nodeLimit: 20_000, greedyAbovePrimes: 1500, petrickLimit: 256)
 
     static func minimize(on: TruthTable, dc: TruthTable? = nil, limits: Limits? = nil) -> Result {
         if on.isZero { return Result(cubes: [], primeCount: 0, essentialCount: 0, exact: true, method: "constant") }
@@ -218,7 +220,7 @@ enum Minimizer {
                           method: "best cover found (search limit)")
         }
         var solver = CoverSolver(rows: ons.count, cover: cover, literals: lits)
-        if let limits { solver.nodeLimit = limits.nodeLimit }
+        if let limits { solver.nodeLimit = limits.nodeLimit; solver.petrickLimit = limits.petrickLimit }
         let sol = solver.solve()
         let method: String
         switch sol.method {
@@ -252,7 +254,7 @@ enum Minimizer {
 
     /// Petrick's method: multiply out the product of sums (one sum per uncovered minterm),
     /// absorbing superset products as we go. Returns nil if it grows too large.
-    static func petrick(_ clausesIn: [[Int]], literals: [Int]) -> Set<Int>? {
+    static func petrick(_ clausesIn: [[Int]], literals: [Int], limit: Int = petrickLimit) -> Set<Int>? {
         // Drop duplicate clauses and clauses implied by smaller ones (a ⊆ b means b is redundant).
         var clauses = Array(Set(clausesIn.map { Set($0) }))
         clauses.sort { $0.count != $1.count ? $0.count < $1.count : $0.sorted().lexicographicallyPrecedes($1.sorted()) }
@@ -270,7 +272,7 @@ enum Minimizer {
             var kept: [Set<Int>] = []
             for p in next where !kept.contains(where: { $0.isSubset(of: p) }) {
                 kept.append(p)
-                if kept.count > petrickLimit { return nil }
+                if kept.count > limit { return nil }
             }
             products = kept
         }
@@ -298,6 +300,7 @@ struct CoverSolver {
     let cover: [[UInt64]]
     let literals: [Int]
     var nodeLimit = 60_000
+    var petrickLimit = Minimizer.petrickLimit
 
     private var words: Int { (rows + 63) / 64 }
 
@@ -369,7 +372,7 @@ struct CoverSolver {
         // Cyclic core.
         let coreRows = (0..<rows).filter { CoverSolver.has(active, $0) }
         let clauses = coreRows.map { coverers($0) }
-        if let pick = Minimizer.petrick(clauses, literals: literals) {
+        if let pick = Minimizer.petrick(clauses, literals: literals, limit: petrickLimit) {
             return Solution(chosen: chosen + pick.sorted(), essentials: essentials, exact: true, method: .petrick)
         }
         let (pick, exact) = branchAndBound(active: active, primes: primes.sorted())

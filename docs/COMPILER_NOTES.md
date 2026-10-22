@@ -166,6 +166,25 @@ The compiler self-tests (`CompilerSelfTest.swift`) cover:
 - Package and board tables: 896 balls, 457 user I/O, every board pin is a user I/O, no
   duplicates, spot checks, banks.
 
+### Timing of a multi-file design
+
+`addsub4_display` (`TestDesigns.addSub4Display`, also `ci/designs/addsub4_display.qzproj`)
+is the size reference for hierarchical designs: four sheets (HA, FA, AddSub4 and the top),
+three 7447s, 9 inputs and 26 outputs, 12 of which depend on all 9 inputs. The self-test
+prints its timing. Measured on an Apple Silicon Mac, 2026-10-22:
+
+| Build | Analysis & Synthesis | Full flow (self-test) | `--compile` wall time | Flatten + 512-row simulation |
+|---|---|---|---|---|
+| debug | 2.67 s | 3.76 s | 2.2 s | 188 ms |
+| release | 0.08 s | 0.19 s | 0.14 s | 44 ms |
+
+Outputs with 9 to 12 support inputs use `Minimizer.wideLimits`: branch and bound stops
+after 20,000 nodes, more than 1500 primes means a greedy cover, and Petrick's method gives
+up beyond 256 products (4096 otherwise). Before that Petrick limit, the 9-input HEX0
+segments spent about 1 s each (release) and 10 s each (debug) in Petrick's absorption step
+before falling back to branch and bound; the covers found are the same size with either
+limit.
+
 `--snapshot-window` renders the real `ContentView` offscreen with `cacheDisplay`; this
 works without screen-recording permission. It renders after a full compilation, for each
 tab, and once mid-run through the asynchronous pipeline. The live run reached
