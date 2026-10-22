@@ -264,6 +264,13 @@ enum HardwareSelfTest {
         check(strict.map { !$0.passed && $0.evaluationError?.contains("unrouted input") == true } == true, "Quartzite's own check still refuses that LUT")
         let reached = mutated(readsOne) { $0.replacingOccurrences(of: "ffffffff.ffcc00f3", with: "ffffffff.ffcc00f2") }
         check(reached.map { !$0.passed && $0.rowsMatching == 15 } == true, "with unrouted inputs reading 1, a flipped entry they reach gives 15/16 rows")
+        // Each output's drive strength must belong to its I/O standard.
+        var lvttl = demoSpec()
+        lvttl.outputStandards = ["f": "3.3-V LVTTL"]
+        check(BitstreamVerifier.check(bt, spec: lvttl).passed, "a 3.3-V LVTTL drive strength on a 3.3-V LVTTL output passes")
+        let v2p5 = mutated(lvttl) { $0.replacingOccurrences(of: "V3P3_LVTTL_16MA_LVCMOS_2MA", with: "V2P5_50OHM") }
+        check(v2p5.map { !$0.passed && $0.pins.contains { $0.name == "f" && !$0.ok && $0.note.contains("V2P5_50OHM does not match") } } == true,
+              "a 2.5 V drive strength on a 3.3-V LVTTL output is caught")
         let cut = mutated { $0.replacingOccurrences(of: "r TD.088.021.0044 LAB.088.021.0:B\n", with: "") }
         check(cut.map { !$0.passed } == true, "a deleted route is caught")
         let oe = mutated { $0 + "\ni GPIO.089.025.3:OEIN.0 1 ; AC30" }

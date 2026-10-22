@@ -193,6 +193,8 @@ enum BitstreamVerifier {
         /// What unrouted LUT inputs read: nil tries every value (Quartzite's own bitstreams must not
         /// depend on it), 1 for foreign bitstreams as Quartus assumes. QZ_FLOAT_INPUT=0|1 overrides it.
         var unroutedInputsRead: Int? = nil
+        /// Output name -> the I/O standard its DRIVE_STRENGTH must belong to (unlisted: not checked).
+        var outputStandards: [String: String] = [:]
         /// Expected output values for a row index.
         var expected: (Int) -> [Bool]
     }
@@ -201,6 +203,15 @@ enum BitstreamVerifier {
 
     /// QZ_FLOAT_INPUT=0|1 pins unrouted ALM inputs to that value, whatever the spec says.
     static var floatOverride: Int? { ProcessInfo.processInfo.environment["QZ_FLOAT_INPUT"].flatMap { $0 == "0" ? 0 : ($0 == "1" ? 1 : nil) } }
+
+    /// Mistral's DRIVE_STRENGTH values of an I/O standard start with this (nil: not checked).
+    static func drivePrefix(_ standard: String) -> String? {
+        switch standard {
+        case "3.3-V LVTTL": return "V3P3_LVTTL_"
+        case "2.5 V": return "V2P5_"
+        default: return nil
+        }
+    }
 
     static func check(_ bt: DecodedBitstream, spec: Spec) -> BitstreamCheck {
         var r = BitstreamCheck()
@@ -248,8 +259,11 @@ enum BitstreamVerifier {
             let oe = bt.outputEnables(pin)
             let cfgs = (bt.gpioSettings[pin] ?? []).map { "\($0.key.mux)=\($0.value)" }.sorted()
             let drives = (bt.gpioSettings[pin] ?? []).filter { $0.key.mux == "DRIVE_STRENGTH" }.map { $0.value }
-            let ok = nodes.count == 1 && !oe.isEmpty && drives.count == 1
-            let note = ok ? "output driver on, data routed from the logic" : (nodes.isEmpty ? "no data route to this pin" : (oe.isEmpty ? "output driver not enabled" : "no drive strength configured"))
+            let standard = spec.outputStandards[name]
+            let wrongDrive = drives.count == 1 && standard.flatMap(drivePrefix).map { !drives[0].hasPrefix($0) } == true
+            let ok = nodes.count == 1 && !oe.isEmpty && drives.count == 1 && !wrongDrive
+            let note = ok ? "output driver on, data routed from the logic" : (nodes.isEmpty ? "no data route to this pin" : (oe.isEmpty ? "output driver not enabled"
+                : (wrongDrive ? "drive strength \(drives[0]) does not match the pin's \(standard ?? "") I/O standard" : "no drive strength configured")))
             r.pins.append(.init(name: name, pin: pin, isInput: false, used: true, node: nodes.first ?? "--", outputEnabled: !oe.isEmpty,
                                 drive: drives.first, config: cfgs, ok: ok, note: note))
             if !ok { r.failures.append("output \(name) (PIN_\(pin)): \(note)") }

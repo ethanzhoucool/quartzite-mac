@@ -132,6 +132,7 @@ enum HardwareFlow {
             inputs: circuit.inputs.map { ($0.name, loc[$0.id] ?? "") },
             outputs: circuit.outputs.map { ($0.name, loc[$0.id] ?? "") },
             unusedInputs: Set(synthesis?.unusedInputs ?? []),
+            outputStandards: Dictionary(circuit.outputs.map { ($0.name, "3.3-V LVTTL") }, uniquingKeysWith: { a, _ in a }),   // as qsf() asks nextpnr for
             expected: { idx in
                 let n = circuit.inputs.count
                 return circuit.evaluate((0..<n).map { k in (idx >> (n - 1 - k)) & 1 == 1 }).outputs
@@ -360,7 +361,8 @@ enum HardwareFlow {
 
     /// Checks a .sof compiled elsewhere (Quartus, from the exported project) against the schematic
     /// with the Assembler's decoder and checks. Quartus folds unrouted LUT inputs into its masks as
-    /// 1, so they are assumed to read 1 (QZ_FLOAT_INPUT overrides).
+    /// 1, so they are assumed to read 1 (QZ_FLOAT_INPUT overrides), and each output's drive strength
+    /// must match its board pin's I/O standard, as the exported .qsf sets it.
     static func verifyForeignSOF(project p: Project, sof url: URL, config: HardwareConfig) throws -> BitstreamCheck {
         let state = CompileFlow.run(p, stages: [.analysisSynthesis, .fitter])
         guard !state.failed, let circuit = state.circuit, let fit = state.fit else {
@@ -385,6 +387,7 @@ enum HardwareFlow {
         let (bt, _) = try decompile(rbfURL, to: work.appendingPathComponent("\(base)_from_sof.bt"), config: c)
         var s = spec(circuit, fit: fit, synthesis: state.synthesis)
         s.unroutedInputsRead = 1
+        s.outputStandards = Dictionary(fit.io.compactMap { io in io.isInput ? nil : io.board.map { (io.name, $0.ioStandard) } }, uniquingKeysWith: { a, _ in a })
         return BitstreamVerifier.check(bt, spec: s)
     }
 

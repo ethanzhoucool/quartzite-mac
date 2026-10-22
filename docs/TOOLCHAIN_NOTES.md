@@ -247,8 +247,9 @@ input, a deleted route, a wrong expected function), which must all be caught.
 - `Quartzite --sof-verify <file.qzproj> <file.sof>` runs the Assembler's bitstream check on
   a `.sof` from Quartus. Every pin needs a location assignment. Unrouted LUT inputs are
   assumed to read 1 and the summary says "verified assuming unrouted LUT inputs read 1"
-  (`QZ_FLOAT_INPUT=0|1` overrides). Quartzite's own bitstreams are still checked with every
-  value of an unrouted input.
+  (`QZ_FLOAT_INPUT=0|1` overrides). Each output's DRIVE_STRENGTH must belong to its board
+  pin's I/O standard (`V3P3_LVTTL_*` for 3.3-V LVTTL, `V2P5_*` for 2.5 V). Quartzite's own
+  bitstreams are still checked with every value of an unrouted input.
 
 ## Open problems / NOT verified
 
