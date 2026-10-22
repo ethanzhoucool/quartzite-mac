@@ -133,6 +133,7 @@ python3 ci/bdf_check.py /tmp/qz-comp-suite-final/*   # PASS for every exported d
 ./build_app.sh                                       # builds Quartzite.app
 ./.build/debug/Quartzite --compile ci/designs/example_sop.qzproj   # 0 errors, 0 warnings
 ./.build/debug/Quartzite --snapshot-window ci/designs/example_sop.qzproj /tmp/qz-shots
+./.build/debug/Quartzite --build-design spec.json out.qzproj  # a .qzproj from a JSON netlist (format in DesignSpec.swift)
 ```
 
 The compiler self-tests (`CompilerSelfTest.swift`) cover:
@@ -171,12 +172,13 @@ The compiler self-tests (`CompilerSelfTest.swift`) cover:
 `addsub4_display` (`TestDesigns.addSub4Display`, also `ci/designs/addsub4_display.qzproj`)
 is the size reference for hierarchical designs: four sheets (HA, FA, AddSub4 and the top),
 three 7447s, 9 inputs and 26 outputs, 12 of which depend on all 9 inputs. The self-test
-prints its timing. Measured on an Apple Silicon Mac, 2026-10-22:
+prints its timing, and the timing of every design in `QUARTZITE_EXTRA_DESIGNS`. Measured
+on an Apple Silicon Mac, 2026-10-22, over several runs:
 
 | Build | Analysis & Synthesis | Full flow (self-test) | `--compile` wall time | Flatten + 512-row simulation |
 |---|---|---|---|---|
-| debug | 2.67 s | 3.76 s | 2.2 s | 188 ms |
-| release | 0.08 s | 0.19 s | 0.14 s | 44 ms |
+| debug | 1.6-2.7 s | 2.5-3.8 s | 2.2 s | 175-188 ms |
+| release | 0.08-0.09 s | 0.19-0.21 s | 0.14 s | 44-49 ms |
 
 Outputs with 9 to 12 support inputs use `Minimizer.wideLimits`: branch and bound stops
 after 20,000 nodes, more than 1500 primes means a greedy cover, and Petrick's method gives

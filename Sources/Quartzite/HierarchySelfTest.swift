@@ -643,15 +643,57 @@ enum HierarchySelfTest {
         }
 
         // Timing (plan 3.7): Analysis & Synthesis, and flattening plus the full simulation.
-        let ts = Date()
-        var simRows = 0
-        if let f = Flattener.flatten(disp).0, let c = Compiler.elaborateFlat(f).0, let s = try? SimulationResult.run(c, project: f.project) { simRows = s.rows.count }
-        let simTime = Date().timeIntervalSince(ts)
         let synth = state.run(.analysisSynthesis)?.elapsed ?? 0
         print(String(format: "  info addsub4_display timing: Analysis & Synthesis %.2f s, full flow %.2f s, flatten + %d-row simulation %.0f ms",
-                     synth, flowTime, simRows, simTime * 1000))
+                     synth, flowTime, sim?.rows.count ?? 0, flattenAndSimulate(disp) * 1000))
 
+        designSpec(check)
         extraDesigns(check)
+    }
+
+    /// `--build-design`: a JSON netlist with an HA sheet and a top that uses it twice.
+    static func designSpec(_ check: Check) {
+        let json = """
+        {"name": "Twice", "sheets": [
+          {"name": "HA", "symbol": true,
+           "inputs": [{"name": "a", "y": 64}, {"name": "b", "y": 112}],
+           "outputs": [{"name": "s", "x": 480, "y": 56}, {"name": "c", "x": 480, "y": 152}],
+           "parts": [{"id": "x", "kind": "xor2", "x": 320, "y": 40}, {"id": "n", "kind": "and2", "x": 320, "y": 136}],
+           "labels": [["x.IN1", "a"], ["x.IN2", "b"], ["n.IN1", "a"], ["n.IN2", "b"]],
+           "wires": [["x.OUT", "s"], ["n.OUT", "c"]]},
+          {"name": "Twice",
+           "inputs": [{"name": "p", "y": 64, "loc": "SW1"}, {"name": "q", "y": 112, "loc": "SW0"}],
+           "outputs": [{"name": "o", "x": 760, "y": 64, "loc": "LEDR0"}],
+           "parts": [{"id": "h1", "kind": "block", "of": "HA", "x": 240, "y": 40},
+                     {"id": "h2", "kind": "block", "of": "HA", "x": 240, "y": 240},
+                     {"id": "v", "kind": "vcc", "x": 120, "y": 360}],
+           "labels": [["h1.a", "p"], ["h1.b", "q"], ["h1.s", "t"], ["h2.a", "t"], ["h2.s", "o"]],
+           "wires": [["v.1", "h2.b"]],
+           "expected": {"o": "0, 3"}}]}
+        """
+        do {
+            let d = try JSONDecoder().decode(DesignSpec.self, from: Data(json.utf8)).build()
+            check(d.topLevelEntity == "Twice" && d.sheets.count == 2 && d.sheet(named: "HA")?.symbol != nil,
+                  "--build-design: the last sheet is the top and HA has a symbol")
+            check(d.top?.inputPins.map(\.name) == ["p", "q"] && d.top?.inputPins.first?.location == BoardPin.named("SW1")?.pin,
+                  "--build-design: inputs keep their order and board locations")
+            check(matches(d) { v in ["o": v["p"]! ^ v["q"]! ^ 1] }, "--build-design: o = p xor q xor 1 (the VCC on h2.b)")
+            if let c = Compiler.compile(d).0, let sim = try? SimulationResult.run(c, project: Flattener.flatten(d).0!.project) {
+                check(sim.matches(output: 0) == true, "--build-design: the expected minterms are stored on the top's output")
+            } else { check(false, "--build-design: the design compiles") }
+        } catch { check(false, "--build-design builds the example (\(error))") }
+        let bad = json.replacingOccurrences(of: "\"h2.s\"", with: "\"h2.sum\"")
+        do {
+            _ = try JSONDecoder().decode(DesignSpec.self, from: Data(bad.utf8)).build()
+            check(false, "--build-design refuses an unknown port")
+        } catch { check("\(error)".contains("no port sum"), "--build-design names an unknown port (\(error))") }
+    }
+
+    /// Seconds to flatten, elaborate and simulate every row of `d`.
+    static func flattenAndSimulate(_ d: DesignProject) -> TimeInterval {
+        let t = Date()
+        if let f = Flattener.flatten(d).0, let c = Compiler.elaborateFlat(f).0 { _ = try? SimulationResult.run(c, project: f.project) }
+        return Date().timeIntervalSince(t)
     }
 
     /// Every *.qzproj in QUARTZITE_EXTRA_DESIGNS (when set) must compile without errors and
@@ -668,7 +710,8 @@ enum HierarchySelfTest {
             }
             let (state, sim) = reference(f.lastPathComponent, d, check)
             if let sim { check(sim.outputNames.indices.allSatisfy { sim.matches(output: $0) != nil }, "\(f.lastPathComponent): every output has an expected table") }
-            _ = state
+            print(String(format: "  info %@ timing: Analysis & Synthesis %.2f s, flatten + %d-row simulation %.0f ms", f.lastPathComponent,
+                         state.run(.analysisSynthesis)?.elapsed ?? 0, sim?.rows.count ?? 0, flattenAndSimulate(d) * 1000))
         }
     }
 
