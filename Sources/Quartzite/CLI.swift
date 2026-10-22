@@ -7,6 +7,16 @@ enum CLI {
 
     static func wants(_ args: [String]) -> Bool { args.contains { flags.contains($0) } }
 
+    /// `--layout` of `--compile`, checked before any work starts (nil if absent).
+    static func layoutOption(_ args: [String]) throws -> Int? {
+        guard let i = args.firstIndex(of: "--layout") else { return nil }
+        let v = i + 1 < args.count ? args[i + 1] : ""
+        guard let n = Int(v), [14, 16, 17].contains(n) else {
+            throw HardwareFlow.Failure(message: "--layout must be 14, 16 or 17" + (v.isEmpty ? "" : " (got \"\(v)\")"))
+        }
+        return n
+    }
+
     /// `--compile <file> --sof <out.sof>`: the full flow with real place and route and the
     /// experimental Assembler, printing each message as it is produced.
     static func compileToSOF(_ p: Project, sof: URL, args: [String], value: (String) -> String?) -> Int32 {
@@ -88,7 +98,8 @@ enum CLI {
             }
             #endif
             if let file = value(after: "--compile") {
-                // Quartzite --compile <file.qzproj> [--report] [--sof <out.sof> [--layout 16|17] [--work <dir>] [--seed n]]
+                // Quartzite --compile <file.qzproj> [--report] [--sof <out.sof> [--layout 14|16|17] [--work <dir>] [--seed n]]
+                _ = try layoutOption(args)
                 let p = try JSONDecoder().decode(Project.self, from: Data(contentsOf: URL(fileURLWithPath: file)))
                 guard let sofPath = value(after: "--sof") else {
                     let state = CompileFlow.run(p)
@@ -142,7 +153,7 @@ enum CLI {
             FileHandle.standardError.write(Data("error: \(error.localizedDescription)\n".utf8))
             return 1
         }
-        print("usage: Quartzite --selftest [dir] | --sof-info <f.sof> | --sof-to-rbf <in.sof> <out.rbf> [--compressed] | --rbf-to-sof <in.rbf> <device> <out.sof> [--template f.sof] [--layout 14|16|17] [--project name] [--compiler-version s] | --compile <file.qzproj> [--report] [--sof <out.sof> [--layout 16|17] [--work dir] [--seed n]] | --export-suite <dir> | --export-project <file.qzproj> <dir>")
+        print("usage: Quartzite --selftest [dir] | --sof-info <f.sof> | --sof-to-rbf <in.sof> <out.rbf> [--compressed] | --rbf-to-sof <in.rbf> <device> <out.sof> [--template f.sof] [--layout 14|16|17] [--project name] [--compiler-version s] | --compile <file.qzproj> [--report] [--sof <out.sof> [--layout 14|16|17] [--work dir] [--seed n]] | --export-suite <dir> | --export-project <file.qzproj> <dir>")
         return 2
     }
 }

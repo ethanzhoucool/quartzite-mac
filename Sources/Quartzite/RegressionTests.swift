@@ -315,6 +315,20 @@ extension RegressionTests {
 extension RegressionTests {
     static func testLabSupportFixes() {
         testExportWritesIOStandards()
+        testCompileLayoutIsCheckedUpFront()
+    }
+
+    /// A bad --layout used to surface only after place and route, or not at all.
+    static func testCompileLayoutIsCheckedUpFront() {
+        for bad in ["abc", "99", "15", "--seed", ""] {
+            assertThrows(try CLI.layoutOption(["Quartzite", "--compile", "a.qzproj", "--sof", "a.sof", "--layout"] + (bad.isEmpty ? [] : [bad])),
+                         "--compile --layout \(bad.isEmpty ? "(missing)" : bad) is refused before any work")
+        }
+        for good in [14, 16, 17] {
+            assertEqual(try? CLI.layoutOption(["--compile", "a.qzproj", "--layout", "\(good)"]), good, "--compile --layout \(good) is accepted")
+        }
+        do { assertNil(try CLI.layoutOption(["--compile", "a.qzproj"]), "no --layout keeps the default") }
+        catch { check(false, "no --layout keeps the default") }
     }
 
     /// Quartus compiles a pin without IO_STANDARD as 2.5 V; the LEDs and HEX displays are 3.3-V LVTTL.
