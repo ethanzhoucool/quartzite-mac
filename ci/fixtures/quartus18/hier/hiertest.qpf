@@ -1,0 +1,3 @@
+QUARTUS_VERSION = "18.0"
+DATE = "00:00:00  October 22, 2026"
+PROJECT_REVISION = "hiertest"
