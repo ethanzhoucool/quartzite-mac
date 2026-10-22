@@ -87,6 +87,7 @@ enum SelfTest {
 
         CompilerSelfTest.run(check)
         HierarchySelfTest.run(check)
+        ImportSelfTest.run(check)
         SOFSelfTest.run(check)
         HardwareSelfTest.run(check)
 

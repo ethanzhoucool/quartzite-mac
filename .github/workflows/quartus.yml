@@ -38,6 +38,26 @@ jobs:
         run: |
           apt-get update -qq && apt-get install -y -qq python3 >/dev/null
           python3 ci/bdf_check.py suite/*
+      - name: Import every export back, export it again and check it
+        run: |
+          mkdir -p roundtrip
+          for d in suite/*/; do
+            n=$(basename "$d")
+            .build/release/Quartzite --import "$(ls "$d"*.qpf | head -1)" "roundtrip/$n.qzproj"
+            .build/release/Quartzite --export-project "roundtrip/$n.qzproj" "roundtrip/$n"
+          done
+          python3 ci/bdf_check.py roundtrip/*/*/
+          python3 - <<'PY'
+          import json, pathlib, sys
+          bad = 0
+          for d in sorted(pathlib.Path('suite').iterdir()):
+              a = json.loads((d / 'expected.json').read_text())
+              b = json.loads(next((pathlib.Path('roundtrip') / d.name).glob('*/expected.json')).read_text())
+              diff = [k for k in ('inputs', 'outputs', 'rows', 'locations', 'top', 'files', 'symbols', 'macros') if a.get(k) != b.get(k)]
+              print(('PASS ' if not diff else 'FAIL ') + d.name + (f' {diff}' if diff else ''))
+              bad += bool(diff)
+          sys.exit(1 if bad else 0)
+          PY
       - uses: actions/upload-artifact@v4
         with: { name: suite, path: suite }
 
