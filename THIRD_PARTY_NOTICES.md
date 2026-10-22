@@ -9,6 +9,8 @@ by `toolchain/build_toolchain.sh`; each project stays under its own license:
 | [Mistral](https://github.com/Ravenslofty/mistral) | Cyclone V bitstream database and `mistral-cv` | BSD-3-Clause |
 | [nextpnr](https://github.com/YosysHQ/nextpnr) | Place and route (`nextpnr-mistral`) | ISC |
 | [Yosys](https://github.com/YosysHQ/yosys) | Synthesis (installed with Homebrew) | ISC |
+| [openFPGALoader](https://github.com/trabucayre/openFPGALoader) | JTAG programming and boundary scan (Tools > Programmer) | Apache-2.0 |
+| [libusb](https://libusb.info) / [libftdi](https://www.intra2net.com/en/developer/libftdi/) | USB access for openFPGALoader (installed with Homebrew) | LGPL-2.1 |
 
 `toolchain/patches/` holds small build fixes for macOS that apply to Mistral and nextpnr.
 Those patches modify files of those projects and are offered under the same license as the
@@ -20,6 +22,9 @@ file they patch.
 - Primitive symbol geometry and the `.bdf`, `.qsf`, `.vwf` and `.sof` layouts were worked
   out from files written by Quartus, for interoperability. No Intel or Altera software,
   libraries or documentation are included.
+- The USB-Blaster II firmware (`blaster_6810.hex`) and the Cyclone V BSDL files are Intel's.
+  Quartzite does not include them; the Programmer uses copies the user supplies from their
+  own Quartus installation and from Intel's website.
 - Quartus, Quartus Prime, Cyclone and Intel are trademarks of Intel Corporation or its
   subsidiaries. Altera is a trademark of Altera Corporation. Terasic and DE10-Standard
   belong to Terasic Inc. Quartzite is not affiliated with or endorsed by any of them.

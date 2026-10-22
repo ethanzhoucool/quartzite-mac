@@ -3,8 +3,9 @@
 A native macOS schematic editor, simulator and compiler for introductory digital-logic
 labs that use Intel (Altera) Quartus Prime with a Terasic DE10-Standard board
 (Cyclone V 5CSXFC6D6F31C6). It's for Apple Silicon Macs, which can't run Quartus: draw the
-circuit, check it, simulate it, then export a real Quartus project to compile and program
-on a lab computer.
+circuit, check it, simulate it, then export a real Quartus project to compile on a lab
+computer. A `.sof` (from Quartus or from Quartzite's experimental flow) can be loaded into
+the board straight from the Mac with Tools > Programmer.
 
 > **Not affiliated with Intel or Altera.** Quartzite is an independent project. It is not
 > made, endorsed or supported by Intel Corporation or Altera Corporation. Quartus, Quartus
@@ -29,6 +30,7 @@ proven and what isn't before relying on it:
 | Multi-file designs, `.bsf` symbols, the 7447 | Block instances and `.bsf` files match files saved by Quartus Prime 18.0 token for token; covered by self-tests and `bdf_check.py`. Real Quartus has **not** compiled a Quartzite multi-file export yet, and the 7447's behaviour with LTN, RBIN or BIN low follows the TI datasheet, not Quartus. |
 | `.sof` container reader/writer | Byte-exact against real Quartus output on 26 public files; `.sof` to `.rbf` matches `quartus_cpf` on 16 pairs (`docs/SOF_FORMAT.md`). |
 | Experimental `.sof` generation | Works end to end with the open-source toolchain and is self-verified, but has **never** been loaded by Quartus Programmer or run on a board. DE10-Standard only. |
+| Programmer and Board view | Command lines, output parsing and safety checks are tested against a real openFPGALoader build with no board attached. Programming a real DE10-Standard and the live Board view have **not** been tried on hardware yet (`docs/PROGRAMMER.md`). |
 
 Keep compiling in Quartus for anything graded.
 
@@ -138,6 +140,44 @@ DE10-Standard's switches and LEDs but not every board. Try a trivial design firs
 Quartus-made `.sof` at hand to reprogram. Without the toolchain the Assembler is skipped
 and everything else works as before. CLI: `Quartzite --compile <file.qzproj> --sof <out.sof>`.
 Details: `docs/ASSEMBLER_NOTES.md`, `docs/TOOLCHAIN_NOTES.md`.
+
+## Programming the board
+
+Tools > Programmer loads a `.sof` into the DE10-Standard's FPGA over the board's own
+USB-Blaster II, like Quartus Programmer, using the open-source
+[openFPGALoader](https://github.com/trabucayre/openFPGALoader). One-time setup:
+
+1. **openFPGALoader.** `toolchain/build_toolchain.sh` builds it into
+   `~/.quartzite/toolchain/prefix/bin` with the rest of the toolchain
+   (`SKIP_OPENFPGALOADER=1` leaves it out). `brew install openfpgaloader` also works.
+2. **USB-Blaster II firmware.** The board's programmer needs Intel's `blaster_6810.hex`,
+   which comes with every Quartus installation, including the free Lite edition, in
+   `<Quartus folder>/quartus/linux64/`. Copy it to your Mac (for example to
+   `~/.quartzite/blaster_6810.hex`, which is searched automatically) or choose it in
+   Quartzite > Settings > Programmer. Quartzite does not include it.
+3. Connect the board's USB-Blaster II port to the Mac and turn the board on.
+
+Then, in the Programmer: **Hardware Setup...** should show `DE-SoC [USB-1]`, **Auto
+Detect** reads the chain (`SOCVHPS`, then `5CSXFC6D6F31`), **Add File...** picks the
+`.sof` (by default `output_files/<project>.sof`), tick **Program/Configure** on the FPGA
+row and click **Start**. The progress bar ends at "100% (Successful)". The design runs
+until the board is turned off, as with Quartus. Quartzite checks the `.sof` first and
+refuses a file made for a different device.
+
+The **Board** tab shows the switches, push buttons, LEDs and seven-segment displays live,
+read over JTAG with boundary-scan SAMPLE, which does not disturb the running design. It
+needs the 5CSXFC6D6F31 BSDL file from Intel's website, chosen in Settings.
+
+From Terminal:
+
+```bash
+Quartzite --detect [--cable usb-blasterII|usb-blaster] [--firmware blaster_6810.hex] [--bsdl 5CSXFC6D6F31.bsd]
+Quartzite --program output_files/lab.sof [--cable ...] [--firmware ...] [--dry-run]
+```
+
+`--dry-run` checks and converts the `.sof` and prints the exact openFPGALoader commands
+without touching the board. Setup, troubleshooting and what has and hasn't been tested
+are in [docs/PROGRAMMER.md](docs/PROGRAMMER.md).
 
 ## Checks
 

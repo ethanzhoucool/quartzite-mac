@@ -29,6 +29,7 @@ Everything lives in `~/.quartzite/toolchain/` (override with `TOOLCHAIN=`):
 | `prefix/bin/nextpnr-mistral` | place and route, writes the `.rbf` |
 | `prefix/bin/mistral-cv` | Mistral master's bitstream tool (decomp/comp/diff/routes) |
 | `prefix/bin/mistral-cv-nextpnr-latest` | the same tool built from the branch nextpnr links |
+| `openFPGALoader/`, `build-openFPGALoader/`, `prefix/bin/openFPGALoader` | JTAG programmer for Tools > Programmer (skip with `SKIP_OPENFPGALOADER=1`; see `docs/PROGRAMMER.md`) |
 | `logs/` | clone and build logs |
 
 ## Versions
@@ -44,6 +45,7 @@ Everything lives in `~/.quartzite/toolchain/` (override with `TOOLCHAIN=`):
 | python | 3.14.4 (already installed) |
 | Mistral | master `d509238a203aadbb76291ab06543a401df91cf54` (2023-09-03) for mistral-cv; `nextpnr-latest` `6a97d3e` (2022-08-10) for nextpnr |
 | nextpnr | master `f7455496240cee1a5a6de262be5bdb1d1e7a3911` (2026-10-01), reports `nextpnr-0.11.1-46-gf7455496` |
+| openFPGALoader | master `26f96b4294b83108ee66fbfbe4d73bc35d9634a8` (2026-10-19), reports `v1.2.0`; libusb 1.0.30, libftdi 1.5, pkgconf (brew bottles), added 2026-10-22 |
 
 Installed formulae: `brew install cmake boost eigen yosys ninja` (55 s, all bottles).
 Nothing else was installed and nothing ran with sudo. nextpnr's submodules
