@@ -464,7 +464,7 @@ struct ProcessProgrammerRunner: ProgrammerRunner {
 }
 
 /// The operations of the Programmer window and CLI, on top of an injectable runner.
-struct ProgrammerService {
+struct ProgrammerService: @unchecked Sendable {
     var options: ProgrammerOptions
     var runner: ProgrammerRunner = ProcessProgrammerRunner()
     var cancel: ProcessCancel? = nil
