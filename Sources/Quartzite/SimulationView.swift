@@ -7,6 +7,9 @@ struct SimulationView: View {
     @State private var kmapOutput = 0
     @AppStorage("groupInputs") private var groupInputs = true
     @AppStorage("busRadix") private var radix = WaveformView.Radix.hex
+    /// Height of the input-order and expected-minterm fields; the row scrolls past `expectedLimit`.
+    @State private var expectedHeight: CGFloat = 60
+    private let expectedLimit: CGFloat = 150
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -20,23 +23,25 @@ struct SimulationView: View {
                         ScrollView(.horizontal) {
                             WaveformView(sim: sim, groupInputs: groupInputs, radix: radix).padding(.vertical, 4)
                         }
-                        HStack(alignment: .top, spacing: 28) {
-                            TruthTableView(sim: sim)
-                            VStack(alignment: .leading, spacing: 20) {
-                                if (2...4).contains(sim.inputCount), !sim.outputNames.isEmpty {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        if sim.outputNames.count > 1 {
-                                            Picker("K-map of", selection: $kmapOutput) {
-                                                ForEach(sim.outputNames.indices, id: \.self) { Text(sim.outputNames[$0]).tag($0) }
+                        // A wide truth table (many outputs) scrolls instead of widening the window.
+                        ScrollView(.horizontal) {
+                            HStack(alignment: .top, spacing: 28) {
+                                TruthTableView(sim: sim)
+                                VStack(alignment: .leading, spacing: 20) {
+                                    if (2...4).contains(sim.inputCount), !sim.outputNames.isEmpty {
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            if sim.outputNames.count > 1 {
+                                                Picker("K-map of", selection: $kmapOutput) {
+                                                    ForEach(sim.outputNames.indices, id: \.self) { Text(sim.outputNames[$0]).tag($0) }
+                                                }
+                                                .frame(width: 180)
                                             }
-                                            .frame(width: 180)
+                                            KMapView(sim: sim, output: min(kmapOutput, sim.outputNames.count - 1))
                                         }
-                                        KMapView(sim: sim, output: min(kmapOutput, sim.outputNames.count - 1))
                                     }
+                                    BoardView(store: store, mode: .play).fixedSize()
                                 }
-                                BoardView(store: store, mode: .play).fixedSize()
                             }
-                            Spacer(minLength: 0)
                         }
                     }
                     .padding(16)
@@ -96,47 +101,89 @@ struct SimulationView: View {
         .background(.bar)
     }
 
+    /// Wraps to the pane's width and scrolls once it is taller than `expectedLimit`, so a design
+    /// with many outputs (Lab 3 has about 30) never pushes the window wider than the screen.
     private var expectedRow: some View {
-        HStack(alignment: .center, spacing: 24) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Input order (MSB to LSB)").font(.caption).foregroundStyle(.secondary)
-                HStack(spacing: 6) {
-                    ForEach(Array(store.project.inputPins.enumerated()), id: \.element.id) { idx, pin in
-                        HStack(spacing: 2) {
-                            Button { store.moveInput(pin.id, by: -1) } label: { Image(systemName: "chevron.left") }
-                                .disabled(idx == 0)
-                            Text(pin.name).fontWeight(.semibold).monospaced().padding(.horizontal, 3)
-                            Button { store.moveInput(pin.id, by: 1) } label: { Image(systemName: "chevron.right") }
-                                .disabled(idx == store.project.inputPins.count - 1)
-                        }
-                        .buttonStyle(.borderless)
-                        .padding(.horizontal, 6).padding(.vertical, 3)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: Theme.radius))
-                    }
-                }
-            }
-            ForEach(store.project.outputPins) { out in
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Expected minterms for \(out.name) (optional)").font(.caption).foregroundStyle(.secondary)
-                    HStack(spacing: 6) {
-                        Text("\(out.name) = Σm(").monospaced()
-                        TextField("e.g. 0, 4, 9", text: Binding(
-                            get: { store.project.expected[out.id.uuidString] ?? "" },
-                            set: { store.setExpected(out.id, $0) }))
-                            .textFieldStyle(.roundedBorder)
-                            .monospaced()
-                            .frame(width: 200)
-                        Text(")").monospaced()
-                        if let sim = store.simulation, let i = sim.outputIDs.firstIndex(of: out.id), let ok = sim.matches(output: i) {
-                            Label(ok ? "Matches" : "Mismatch", systemImage: ok ? "checkmark.circle.fill" : "xmark.octagon.fill")
-                                .foregroundStyle(ok ? Theme.ok : Theme.error)
+                    Text("Input order (MSB to LSB)").font(.caption).foregroundStyle(.secondary)
+                    FlowLayout(spacing: 6) {
+                        ForEach(Array(store.project.inputPins.enumerated()), id: \.element.id) { idx, pin in
+                            HStack(spacing: 2) {
+                                Button { store.moveInput(pin.id, by: -1) } label: { Image(systemName: "chevron.left") }
+                                    .disabled(idx == 0)
+                                Text(pin.name).fontWeight(.semibold).monospaced().padding(.horizontal, 3)
+                                Button { store.moveInput(pin.id, by: 1) } label: { Image(systemName: "chevron.right") }
+                                    .disabled(idx == store.project.inputPins.count - 1)
+                            }
+                            .buttonStyle(.borderless)
+                            .padding(.horizontal, 6).padding(.vertical, 3)
+                            .background(.quaternary, in: RoundedRectangle(cornerRadius: Theme.radius))
+                        }
+                    }
+                }
+                if !store.project.outputPins.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Expected minterms (optional)").font(.caption).foregroundStyle(.secondary)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 340), spacing: 24, alignment: .leading)], alignment: .leading, spacing: 6) {
+                            ForEach(store.project.outputPins) { expectedField($0) }
                         }
                     }
                 }
             }
-            Spacer()
+            .padding(.horizontal, 16).padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { expectedHeight = $0 }
         }
-        .padding(.horizontal, 16).padding(.vertical, 10)
+        .frame(height: min(expectedHeight, expectedLimit))
+    }
+
+    private func expectedField(_ out: Component) -> some View {
+        HStack(spacing: 6) {
+            Text("\(out.name) = Σm(").monospaced()
+            TextField("e.g. 0, 4, 9", text: Binding(
+                get: { store.project.expected[out.id.uuidString] ?? "" },
+                set: { store.setExpected(out.id, $0) }))
+                .textFieldStyle(.roundedBorder)
+                .monospaced()
+                .frame(minWidth: 110, maxWidth: 220)
+            Text(")").monospaced()
+            if let sim = store.simulation, let i = sim.outputIDs.firstIndex(of: out.id), let ok = sim.matches(output: i) {
+                Label(ok ? "Matches" : "Mismatch", systemImage: ok ? "checkmark.circle.fill" : "xmark.octagon.fill")
+                    .foregroundStyle(ok ? Theme.ok : Theme.error)
+            }
+        }
+        .help("Expected minterms for \(out.name) (optional)")
+    }
+}
+
+/// Left to right, wrapping onto a new line when the width runs out.
+private struct FlowLayout: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        arrange(width: proposal.width ?? .infinity, subviews).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for (s, p) in zip(subviews, arrange(width: bounds.width, subviews).origins) {
+            s.place(at: CGPoint(x: bounds.minX + p.x, y: bounds.minY + p.y), proposal: .unspecified)
+        }
+    }
+
+    private func arrange(width: CGFloat, _ subviews: Subviews) -> (origins: [CGPoint], size: CGSize) {
+        var origins: [CGPoint] = []
+        var x: CGFloat = 0, y: CGFloat = 0, line: CGFloat = 0, used: CGFloat = 0
+        for s in subviews {
+            let size = s.sizeThatFits(.unspecified)
+            if x > 0 && x + size.width > width { x = 0; y += line + spacing; line = 0 }
+            origins.append(CGPoint(x: x, y: y))
+            used = max(used, x + size.width)
+            x += size.width + spacing
+            line = max(line, size.height)
+        }
+        return (origins, CGSize(width: used, height: y + line))
     }
 }
 
@@ -183,7 +230,8 @@ struct WaveformView: View {
         return r
     }
 
-    private var stepWidth: CGFloat { sim.rows.count <= 16 ? 46 : (sim.rows.count <= 64 ? 24 : 12) }
+    /// 1,024 rows at 12 points would make a canvas wider than a Retina layer can be (16,384 pixels).
+    private var stepWidth: CGFloat { sim.rows.count <= 16 ? 46 : (sim.rows.count <= 64 ? 24 : (sim.rows.count <= 512 ? 12 : 6)) }
     private var timeStep: Double { QuartusExport.vwfTiming(sim.inputCount).step }
 
     var body: some View {
@@ -221,9 +269,10 @@ struct WaveformView: View {
                         hex.addLine(to: CGPoint(x: b - 3, y: lo)); hex.addLine(to: CGPoint(x: a + 3, y: lo))
                         hex.closeSubpath()
                         ctx.stroke(hex, with: .color(.blue), lineWidth: 1)
-                        if stepWidth >= 20 || radix == .hex {
-                            ctx.draw(Text(radix.format(i, bits: sim.inputCount)).font(.system(size: radix == .binary ? 8 : 10, design: .monospaced)),
-                                     at: CGPoint(x: (a + b) / 2, y: mid))
+                        // Only labels that fit their step (monospaced digits are 0.6 em wide); with 128+ rows they would overlap.
+                        let label = radix.format(i, bits: sim.inputCount), size: CGFloat = radix == .binary ? 8 : 10
+                        if CGFloat(label.count) * size * 0.6 <= stepWidth - 4 {
+                            ctx.draw(Text(label).font(.system(size: size, design: .monospaced)), at: CGPoint(x: (a + b) / 2, y: mid))
                         }
                     }
                 case .input(let k):
@@ -290,38 +339,69 @@ struct WaveformSnapshot: View {
 struct TruthTableView: View {
     var sim: SimulationResult
 
+    /// One monospaced attributed string per row, not a view per cell: 512 rows of 9 inputs and 30
+    /// outputs would otherwise be ~36,000 views, rebuilt on every keystroke in an expected field.
+    /// Past 64 rows the table scrolls on its own so only the rows on screen are built.
     var body: some View {
-        Grid(alignment: .center, horizontalSpacing: 14, verticalSpacing: 3) {
-            GridRow {
-                Text("m").foregroundStyle(.secondary)
-                ForEach(sim.inputNames, id: \.self) { Text($0) }
-                ForEach(sim.outputNames.indices, id: \.self) { o in
-                    Text(sim.outputNames[o]).fontWeight(.bold)
-                    if sim.expected[o] != nil { Text("exp").foregroundStyle(.secondary).fixedSize() }
-                }
-            }
-            .font(.system(.callout, design: .monospaced))
-            Divider().gridCellUnsizedAxes(.horizontal)
-            ForEach(sim.rows.indices, id: \.self) { i in
-                GridRow {
-                    Text("\(i)").foregroundStyle(.secondary)
-                    ForEach(sim.rows[i].inputs.indices, id: \.self) { Text(sim.rows[i].inputs[$0] ? "1" : "0") }
-                    ForEach(sim.outputNames.indices, id: \.self) { o in
-                        let v = sim.rows[i].outputs[o]
-                        Text(v ? "1" : "0").fontWeight(.bold)
-                            .foregroundStyle(mismatch(i, o) ? Color.red : (v ? Color.primary : Color.secondary))
-                        if let exp = sim.expected[o] {
-                            Text(exp.contains(i) ? "1" : "0").foregroundStyle(.secondary)
-                        }
+        VStack(alignment: .leading, spacing: 3) {
+            Text(header)
+            Divider()
+            if sim.rows.count <= 64 {
+                ForEach(sim.rows.indices, id: \.self) { Text(row($0)) }
+            } else {
+                ScrollView(.vertical) {
+                    LazyVStack(alignment: .leading, spacing: 3) {
+                        ForEach(sim.rows.indices, id: \.self) { Text(row($0)) }
                     }
                 }
-                .font(.system(.callout, design: .monospaced))
-                .background(mismatch(i, nil) ? Color.red.opacity(0.12) : .clear)
+                .frame(height: 420)
             }
         }
+        .font(.system(.callout, design: .monospaced))
         .fixedSize()
         .padding(12)
         .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: Theme.radius))
+    }
+
+    private static let gap = "  "
+
+    /// `s` centred in a column `width` characters wide.
+    private func cell(_ s: String, _ width: Int) -> String {
+        let pad = max(0, width - s.count)
+        return String(repeating: " ", count: pad / 2) + s + String(repeating: " ", count: pad - pad / 2)
+    }
+
+    private func run(_ s: String, _ color: Color? = nil, bold: Bool = false) -> AttributedString {
+        var a = AttributedString(s)
+        if let color { a.foregroundColor = color }
+        if bold { a.font = .system(.callout, design: .monospaced).bold() }
+        return a
+    }
+
+    private var indexWidth: Int { String(max(0, sim.rows.count - 1)).count }
+
+    private var header: AttributedString {
+        var s = run(cell("m", indexWidth), .secondary)
+        for name in sim.inputNames { s += run(Self.gap + name) }
+        for o in sim.outputNames.indices {
+            s += run(Self.gap + sim.outputNames[o], bold: true)
+            if sim.expected[o] != nil { s += run(Self.gap + "exp", .secondary) }
+        }
+        return s
+    }
+
+    private func row(_ i: Int) -> AttributedString {
+        let r = sim.rows[i]
+        var line = run(cell("\(i)", indexWidth), .secondary)
+        line += run(zip(sim.inputNames, r.inputs).map { Self.gap + cell($1 ? "1" : "0", $0.count) }.joined())
+        for o in sim.outputNames.indices {
+            let v = r.outputs[o]
+            line += run(Self.gap + cell(v ? "1" : "0", sim.outputNames[o].count),
+                        mismatch(i, o) ? .red : (v ? .primary : .secondary), bold: true)
+            if let exp = sim.expected[o] { line += run(Self.gap + cell(exp.contains(i) ? "1" : "0", 3), .secondary) }
+        }
+        if mismatch(i, nil) { line.backgroundColor = Color.red.opacity(0.12) }
+        return line
     }
 
     private func mismatch(_ i: Int, _ o: Int?) -> Bool {
