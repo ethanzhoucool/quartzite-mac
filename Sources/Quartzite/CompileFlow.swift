@@ -273,7 +273,7 @@ enum CompileFlow {
             } else {
                 status = .skipped
                 body.append(Message(level: .info, text: "No programming file was generated. Quartzite writes an experimental .sof only with the open-source toolchain (yosys, nextpnr-mistral, mistral-cv); without it, programming files come from Quartus."))
-                body.append(Message(level: .info, text: "To program the DE10-Standard: export the project (File > Export Quartus Project), open \(state.project.entityName).qpf in Quartus Prime at the lab, run Start Compilation, then open Tools > Programmer and add output_files/\(state.project.entityName).sof."))
+                body.append(Message(level: .info, text: "To program the DE10-Standard: export the project (File > Export Quartus Project), open \(state.project.entityName).qpf in Quartus Prime at the lab, run Start Compilation, then program output_files/\(state.project.entityName).sof with Tools > Programmer (in Quartus, or in Quartzite with the board connected to this Mac)."))
                 if state.hardware != nil {
                     body.append(Message(level: .info, text: "No bitstream is available from the Fitter, so the experimental .sof was not generated. Run the Fitter (or Start Compilation) again."))
                 } else if let note = state.toolchainNote {

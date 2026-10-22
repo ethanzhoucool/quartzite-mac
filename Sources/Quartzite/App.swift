@@ -7,6 +7,7 @@ import AppKit
 struct QuartziteApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var store: Store
+    @State private var programmer = ProgrammerModel()
 
     init() {
         if CLI.wants(CommandLine.arguments) {
@@ -23,7 +24,21 @@ struct QuartziteApp: App {
                 .onAppear { delegate.openFile = { [store] in store.open($0) } }
         }
         .commands { QuartusCommands(store: store) }
+        Window("Programmer", id: "programmer") {
+            ProgrammerView(model: programmer, defaultFile: { [store] in store.programmingFile })
+                .navigationTitle(programmerTitle)
+        }
+        .defaultSize(width: 980, height: 680)
+        Settings {
+            TabView {
+                ProgrammerSettingsView(model: programmer)
+                    .tabItem { Label("Programmer", systemImage: "cable.connector") }
+            }
+        }
     }
+
+    /// Quartus: "Programmer - <file>.cdf"; Quartzite has no chain file, so the hardware is shown.
+    private var programmerTitle: String { "Programmer - \(programmer.hardwareName)" }
 
     /// Quartus: "Quartus Prime Lite Edition - C:/path/project - entity".
     private var windowTitle: String {
@@ -220,6 +235,7 @@ struct QuartusCommands: Commands {
 @MainActor
 struct ContentView: View {
     @Bindable var store: Store
+    @Environment(\.openWindow) private var openWindow
     @AppStorage("messagesHeight") private var messagesHeight: Double = 170
     @AppStorage(PaneVisibility.navigator) private var showNavigator = true
     @AppStorage(PaneVisibility.tasks) private var showTasks = true
@@ -270,6 +286,7 @@ struct ContentView: View {
             StatusBar(store: store)
         }
         .sheet(item: $store.sheet) { s in PropertySheetView(store: store, sheet: s) }
+        .onAppear { store.openProgrammerWindow = { openWindow(id: "programmer") } }
     }
 }
 
@@ -316,7 +333,7 @@ struct MainToolbar: View {
             separator
             ToolButton("doc.text.magnifyingglass", "Compilation Report (Command-R)") { store.tab = .report }
             separator
-            ToolButton("cable.connector", "Programmer (runs in Quartus)") { store.openProgrammer() }
+            ToolButton("cable.connector", "Programmer (program the DE10-Standard over USB)") { store.openProgrammer() }
             Spacer(minLength: 12)
             ToolButton("waveform.path", "Run Functional Simulation (Option-Command-R)") { store.simulate() }
             Button { store.exportQuartusProject() } label: {
@@ -537,7 +554,7 @@ struct TasksPane: View {
                 expandable: true, help: "Start EDA Netlist Writer", action: { store.start(.eda) }),
             Row(id: "eda.report", title: "View Report", depth: 2, icon: "tablecells", help: "Open the EDA Netlist Writer report", action: report("stage.eda.summary")),
             Row(id: "program", title: "Program Device (Open Programmer)", depth: 0, icon: "cable.connector",
-                help: "Programming the board happens in Quartus Programmer", action: { store.openProgrammer() }),
+                help: "Open the Programmer to load a .sof into the DE10-Standard over its USB-Blaster II", action: { store.openProgrammer() }),
         ]
         // A report row only works once its stage has run.
         for i in r.indices where r[i].id.hasSuffix(".report") {
@@ -565,8 +582,8 @@ struct TasksPane: View {
                 help: "Run Functional Simulation", action: { store.simulate() }),
             Row(id: "lab.export", title: "Export Quartus Project", depth: 0, status: store.exportedTo == nil ? .notRun : .succeeded,
                 icon: "square.and.arrow.up", help: "Write the project for the lab computers", action: { store.exportQuartusProject() }),
-            Row(id: "lab.program", title: "Program Device (in Quartus at the lab)", depth: 0, icon: "cable.connector",
-                help: "Programming the board happens in Quartus at the lab", action: { store.openProgrammer() }),
+            Row(id: "lab.program", title: "Program Device", depth: 0, icon: "cable.connector",
+                help: "Open the Programmer to load a .sof into the DE10-Standard over its USB-Blaster II", action: { store.openProgrammer() }),
         ]
     }
 

@@ -266,24 +266,15 @@ extension Store {
         tab = .waveform
     }
 
-    /// Tools > Programmer: explains why programming happens in Quartus, and offers the
-    /// experimental .sof when this compilation produced one.
-    func openProgrammer() {
-        let quartus = "Export the project (Shift-Command-E), open \(topProject.entityName).qpf in Quartus Prime, run Start Compilation, then use Tools > Programmer with output_files/\(topProject.entityName).sof."
-        if let a = flow?.assembly, a.passed, FileManager.default.fileExists(atPath: a.sofURL.path) {
-            let al = NSAlert()
-            al.messageText = "Programmer runs in Quartus"
-            al.informativeText = "A Mac cannot drive the DE10-Standard's USB-Blaster II. Copy \(a.sofURL.lastPathComponent) (checksum \(a.checksumText)) to a computer with Quartus Prime, open Tools > Programmer, click Add File, select it and click Start.\n\n\(HardwareFlow.experimentalNotice)\n\nFor graded work: \(quartus)"
-            al.addButton(withTitle: "Show in Finder")
-            al.addButton(withTitle: "OK")
-            if al.runModal() == .alertFirstButtonReturn { revealProgrammingFile() }
-            return
-        }
-        let why = toolchainSearch.toolchain == nil
-            ? "Quartzite writes an experimental .sof only when the open-source toolchain (yosys, nextpnr-mistral, mistral-cv) is installed."
-            : (useHardwareFlow ? "Run Start Compilation to generate the experimental .sof first."
-                               : "Turn on Processing > Use Open-Source Fitter and Assembler and run Start Compilation to generate an experimental .sof.")
-        alert("Programmer runs in Quartus at the lab", "A Mac cannot drive the DE10-Standard's USB-Blaster II. \(why) \(quartus)")
+    /// Tools > Programmer: opens the Programmer window.
+    func openProgrammer() { openProgrammerWindow?() }
+
+    /// The .sof the Programmer offers first: this compilation's, else output_files/<entity>.sof
+    /// next to the project (where Quartus also writes it).
+    var programmingFile: URL? {
+        if let a = flow?.assembly, a.passed, FileManager.default.fileExists(atPath: a.sofURL.path) { return a.sofURL }
+        let u = Store.outputDirectory(project: topProject, fileURL: fileURL).appendingPathComponent("\(topProject.entityName).sof")
+        return FileManager.default.fileExists(atPath: u.path) ? u : nil
     }
 
     /// Saves the current Quartzite netlist (EDA Netlist Writer output).

@@ -171,6 +171,8 @@ final class Store {
     var toolchainSearch = Toolchain.Search(toolchain: nil, missing: [])
     /// Lets Stop Processing terminate the external tool that is running.
     var hardwareCancel: ProcessCancel?
+    /// Opens the Programmer window (set by the main window, which can open windows).
+    @ObservationIgnored var openProgrammerWindow: (() -> Void)?
     /// Identifies the stage whose tool output is being streamed into `messages` from `liveStart` on.
     var liveStage: UUID?
     var liveStart = 0
