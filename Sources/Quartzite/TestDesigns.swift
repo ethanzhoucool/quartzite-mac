@@ -128,6 +128,42 @@ enum TestDesigns {
         return b
     }
 
+    /// 4-bit adder/subtractor from four FA blocks: S = A + (B xor m) + m, cout the carry.
+    static func addSub4(_ db: DesignBuilder, name: String = "AddSub4", full: String = "FA", locations: Bool = true) -> Builder {
+        func loc(_ label: String) -> String? { locations ? BoardPin.de10Standard.first { $0.label == label }?.pin : nil }
+        var b = db.builder(name)
+        var order: [UUID] = []
+        for (k, i) in (0..<4).reversed().enumerated() { order.append(b.input("a\(i)", y: 64 + 48 * k, loc: loc("SW\(6 + i)")).id) }
+        for (k, i) in (0..<4).reversed().enumerated() { order.append(b.input("b\(i)", y: 272 + 48 * k, loc: loc("SW\(2 + i)")).id) }
+        order.append(b.input("m", y: 480, loc: loc("SW0")).id)
+        b.p.inputOrder = order
+        for i in 0..<4 {
+            let x = b.gate(.xor2, x: 240, y: 560 - 160 * i)
+            b.label(b.pin(x, 0), "b\(i)"); b.label(b.pin(x, 1), "m"); b.label(b.out(x), "y\(i)")
+            let fa = b.block(full, x: 440, y: 520 - 160 * i)
+            b.label(b.port(fa, "x"), "a\(i)"); b.label(b.port(fa, "y"), "y\(i)")
+            b.label(b.port(fa, "cin"), i == 0 ? "m" : "c\(i)")
+            b.label(b.port(fa, "s"), "s\(i)")
+            b.label(b.port(fa, "cout"), i == 3 ? "cout" : "c\(i + 1)")
+        }
+        for i in 0..<4 { b.output("s\(i)", x: 760, y: 64 + 48 * (3 - i), loc: loc("LEDR\(i)")) }
+        b.output("cout", x: 760, y: 16, loc: loc("LEDR4"))
+        return b
+    }
+
+    /// HA -> FA -> AddSub4, top AddSub4: a3..a0 on SW9..SW6, b3..b0 on SW5..SW2, m on SW0,
+    /// s3..s0 on LEDR3..LEDR0 and cout on LEDR4.
+    static func addSub4Design() -> DesignProject {
+        var db = DesignBuilder("AddSub4")
+        db.sheet(halfAdder(db))
+        db.createSymbol("HA")
+        db.sheet(fullAdder(db))
+        db.createSymbol("FA")
+        db.sheet(addSub4(db))
+        db.createSymbol("AddSub4")
+        return db.d
+    }
+
     /// DE10-Standard switches SW3..SW0 for w, x, y, z and LEDR0 for f.
     static let starterLocations = ["w": "PIN_AC30", "x": "PIN_AB28", "y": "PIN_Y27", "z": "PIN_AB30", "f": "PIN_AA24"]
 

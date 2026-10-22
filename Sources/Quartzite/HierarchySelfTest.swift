@@ -39,6 +39,35 @@ enum HierarchySelfTest {
         sheetOps(check)
         writers(check)
         macros(check)
+        flattening(check)
+    }
+
+    /// Truth table rows (outputs as a bit string per row) of a compiled circuit.
+    static func rows(_ c: CompiledCircuit) -> [String] {
+        let n = c.inputs.count
+        return (0..<(1 << n)).map { r in
+            c.evaluate((0..<n).map { (r >> (n - 1 - $0)) & 1 == 1 }).outputs.map { $0 ? "1" : "0" }.joined()
+        }
+    }
+
+    /// Rows of `d`, with output columns named, for an oracle check.
+    static func table(_ d: DesignProject, forceFull: Bool = true) -> (inputs: [String], outputs: [String], rows: [[Bool]])? {
+        guard let (f, _) = Optional(Flattener.flatten(d, forceFull: forceFull)), let f, let c = Compiler.elaborateFlat(f).0 else { return nil }
+        let n = c.inputs.count
+        return (c.inputs.map(\.name), c.outputs.map(\.name),
+                (0..<(1 << n)).map { r in c.evaluate((0..<n).map { (r >> (n - 1 - $0)) & 1 == 1 }).outputs })
+    }
+
+    /// Checks every row of `d` against `oracle` (input values by name -> output values by name).
+    static func matches(_ d: DesignProject, _ oracle: ([String: Int]) -> [String: Int]) -> Bool {
+        guard let t = table(d) else { return false }
+        for (r, outs) in t.rows.enumerated() {
+            var ins: [String: Int] = [:]
+            for (k, name) in t.inputs.enumerated() { ins[name] = (r >> (t.inputs.count - 1 - k)) & 1 }
+            let want = oracle(ins)
+            for (k, name) in t.outputs.enumerated() where want[name] != (outs[k] ? 1 : 0) { return false }
+        }
+        return true
     }
 
     /// HA and FA (two HA blocks), top FA, symbols created.
@@ -322,6 +351,130 @@ enum HierarchySelfTest {
                 check((try? QuartusExport.makeBundle(b.p, conn: cc.conn)) != nil, "a sheet with \(name) exports")
             }
         }
+    }
+
+    // MARK: - Flattening and the split compiler (plan 3.1-3.3)
+
+    static func flattening(_ check: Check) {
+        print("Flattening")
+        for (name, p) in TestDesigns.all {
+            let d = DesignProject(single: p)
+            let fast = Flattener.flatten(d).0, full = Flattener.flatten(d, forceFull: true).0
+            let a = fast.flatMap { Compiler.elaborateFlat($0).0 }, b = full.flatMap { Compiler.elaborateFlat($0).0 }
+            check(fast?.identity == true && full?.identity == false && a != nil && b != nil && rows(a!) == rows(b!)
+                  && a!.inputs.map(\.id) == b!.inputs.map(\.id) && a!.outputs.map(\.id) == b!.outputs.map(\.id),
+                  "\(name): the full flattener gives the same truth table and pins as the sheet itself")
+            check(Connectivity(p).nets.count == Connectivity(p, geometric: true).nets.count, "\(name): geometric connectivity is the default for drawn sheets")
+        }
+
+        var ha = haFA()
+        ha.topLevelEntity = "HA"
+        check(matches(ha) { ["s": $0["a"]! ^ $0["b"]!, "c": $0["a"]! & $0["b"]!] }, "HA matches s = a xor b, c = a and b")
+        let fa = haFA()
+        check(matches(fa) { v in
+            let t = v["x"]! + v["y"]! + v["cin"]!
+            return ["s": t & 1, "cout": t >> 1]
+        }, "FA (two HA blocks) is a full adder")
+        let add = TestDesigns.addSub4Design()
+        let addOracle: ([String: Int]) -> [String: Int] = { v in
+            let a = (0..<4).reduce(0) { $0 | v["a\($1)"]! << $1 }, b = (0..<4).reduce(0) { $0 | v["b\($1)"]! << $1 }, m = v["m"]!
+            let sum = a + (m == 1 ? b ^ 15 : b) + m
+            var out = ["cout": (sum >> 4) & 1]
+            for i in 0..<4 { out["s\(i)"] = (sum >> i) & 1 }
+            return out
+        }
+        check(matches(add, addOracle), "AddSub4 (HA -> FA -> AddSub4) adds and subtracts on all 512 rows")
+        let (c, msgs, flat) = Compiler.compile(add)
+        check(c != nil && flat?.identity == false && !msgs.contains { $0.level == .error }, "AddSub4 compiles as a design")
+        check(c?.inputs.map(\.name) == ["a3", "a2", "a1", "a0", "b3", "b2", "b1", "b0", "m"], "AddSub4 keeps the top sheet's input order")
+        if let flat {
+            check(flat.sheetsUsed == ["AddSub4", "FA", "HA"] && flat.macrosUsed.isEmpty, "AddSub4 uses AddSub4, FA and HA")
+            check(flat.project.components.filter { $0.kind.isGate }.count == 4 + 4 * 5, "the flat AddSub4 has 4 XOR + 4 x 5 gates")
+            let names = flat.origin.values.map(\.displayPath)
+            check(names.contains("FA:inst3|HA:inst1|inst1"), "flat gates keep their hierarchical names (\(names.sorted().prefix(2)))")
+            let labels = Set(flat.project.labels.values)
+            check(labels.contains("a3") && labels.contains("cout") && labels.contains("c1"), "flat nets keep the top's pin and node names")
+            check(Set(flat.project.components.map { $0.name.lowercased() }).count == flat.project.components.count, "flat instance names are unique")
+        }
+        var renamed = add
+        let haID = renamed.sheet(named: "HA")!.id!
+        try? renamed.renameSheet(id: haID, to: "HALF")
+        check(matches(renamed, addOracle) && Compiler.compile(renamed).0 != nil, "after renaming HA to HALF, AddSub4 still compiles and adds")
+
+        // Negative cases: each gives exactly one error.
+        func errors(_ d: DesignProject) -> [String] {
+            Compiler.compile(d).1.filter { $0.level == .error && !$0.text.hasPrefix("Design check failed") }.map(\.text)
+        }
+        var rec = haFA()
+        rec.topLevelEntity = "HA"
+        let hi = rec.sheetIndex(named: "HA")!
+        var self_ = Component(kind: .block, name: "inst9", x: 600, y: 400)
+        self_.symbol = rec.sheets[hi].symbol
+        rec.sheets[hi].components.append(self_)
+        let recErr = errors(rec)
+        check(recErr.count == 1 && recErr[0].contains("contains itself"), "a block that contains itself gives one error (\(recErr))")
+        // One HA block in a wrapper sheet.
+        var wrap = TestDesigns.DesignBuilder("Wrap")
+        wrap.sheet(TestDesigns.halfAdder(wrap))
+        wrap.createSymbol("HA")
+        var wb = wrap.builder("Wrap")
+        let p1 = wb.input("p", y: 64), q1 = wb.input("q", y: 112)
+        let h = wb.block("HA", x: 240, y: 40)
+        wb.wire(wb.out(p1), wb.port(h, "a")); wb.wire(wb.out(q1), wb.port(h, "b"))
+        let so = wb.output("so", x: 520, y: 72), co = wb.output("co", x: 520, y: 120)
+        wb.wire(wb.port(h, "s"), wb.pin(so, 0)); wb.wire(wb.port(h, "c"), wb.pin(co, 0))
+        wrap.sheet(wb)
+        check(matches(wrap.d) { ["so": $0["p"]! ^ $0["q"]!, "co": $0["p"]! & $0["q"]!] }, "a block wired with drawn wires flattens like one connected by names")
+        var missing = wrap.d
+        missing.sheets.removeAll { $0.entityName == "HA" }
+        let missErr = errors(missing)
+        check(missErr.count == 1 && missErr[0].contains("HA.bdf"), "a missing child sheet gives one error (\(missErr))")
+        var stale = wrap.d
+        let si = stale.sheetIndex(named: "HA")!
+        var haSheet = stale.sheets[si]
+        haSheet.components.removeAll { $0.name == "c" }
+        let kept = haSheet
+        haSheet.wires.removeAll { w in !kept.contains(w.a) || !kept.contains(w.b) }
+        let cy = Component(kind: .output, name: "cy", x: 480, y: 152)
+        haSheet.components.append(cy)
+        let and = haSheet.components.first { $0.kind == .and2 }!
+        haSheet.wires.append(Wire(a: PortRef(comp: and.id, port: 2), b: PortRef(comp: cy.id, port: 0)))
+        stale.sheets[si] = haSheet
+        let staleErr = errors(stale)
+        check(staleErr.count == 1 && staleErr[0].hasPrefix("Port 'c' is not in HA.bdf"), "a port the child no longer has gives one error (\(staleErr))")
+        check(Flattener.flatten(stale).1.filter { $0.level == .error }.count == 1, "the flattener reports the same port mismatch once")
+
+        var open = haFA()
+        let fi = open.sheetIndex(named: "FA")!
+        let h2 = open.sheets[fi].components.first { $0.kind == .block && $0.name == "inst1" }!
+        open.sheets[fi].labels.removeValue(forKey: PortRef(comp: h2.id, port: h2.portIndex(named: "b")!).key)
+        let (oc, om, _) = Compiler.compile(open)
+        let warns = om.filter { $0.level == .warning && $0.text.contains("not connected") }
+        check(oc != nil && warns.count == 1 && warns[0].sheet == "FA" && warns[0].component == h2.id,
+              "an unconnected HA input compiles with one warning that points at the block (\(warns.map(\.text)))")
+        if let oc {
+            // The second HA computes s1 xor 1 and s1 and 1: s = x xor y xor 1, cout = x y + (x xor y).
+            let ins = oc.inputs.map(\.name), outs = oc.outputs.map(\.name)
+            let ok = (0..<8).allSatisfy { r in
+                var v: [String: Int] = [:]
+                for (k, n) in ins.enumerated() { v[n] = (r >> (2 - k)) & 1 }
+                let x = v["x"]!, y = v["y"]!
+                let out = oc.evaluate(ins.map { v[$0] == 1 }).outputs
+                let want = ["s": x ^ y ^ 1, "cout": x & y | (x ^ y)]
+                return outs.enumerated().allSatisfy { k, n in (out[k] ? 1 : 0) == want[n] }
+            }
+            check(ok, "the unconnected HA input acts as 1 (VCC)")
+            check(oc.stats.gates == 5 && oc.generated.count == 1, "the default driver is generated, not counted as a gate")
+        }
+
+        var mac = TestDesigns.Builder("macro7447_unconnected")
+        let a = mac.input("a", y: 64)
+        let m = mac.macro("7447", x: 240, y: 40)
+        mac.wire(mac.out(a), mac.port(m, "A"))
+        mac.label(mac.port(m, "OA"), "seg")
+        mac.output("seg", x: 520, y: 64)
+        let macErr = errors(DesignProject(single: mac.p))
+        check(macErr.count == 6 && macErr.allSatisfy { $0.contains("VCC") }, "each unconnected 7447 input is an error that says to tie it to VCC (\(macErr.count))")
     }
 
     // MARK: - Sheet operations (plan 1.4)

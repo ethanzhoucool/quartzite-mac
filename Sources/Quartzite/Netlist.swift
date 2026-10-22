@@ -22,6 +22,8 @@ struct Message: Identifiable, Hashable {
     var children: [Message] = []
     /// Compilation stage that produced the message (nil for editor messages).
     var stage: String? = nil
+    /// Entity of the sheet `component` is on, when it is not the open sheet's design top.
+    var sheet: String? = nil
 
     /// "Info: text" lines with children indented four spaces, like a Quartus .rpt file.
     func reportLines(indent: Int = 0) -> [String] {
@@ -46,8 +48,11 @@ struct Connectivity {
     /// Pairs of ports that overlap on the canvas (connected implicitly).
     var touching: [(PortRef, PortRef)] = []
 
-    init(_ project: Project) {
+    /// `geometric` (default: unless the project is a generated netlist) also joins ports that
+    /// sit on the same point.
+    init(_ project: Project, geometric: Bool? = nil) {
         guard project.structuralErrors.isEmpty else { return }
+        let geometric = geometric ?? !project.isFlatNetlist
         var all: [PortRef] = []
         for c in project.components {
             for i in c.portIndices { all.append(PortRef(comp: c.id, port: i)) }
@@ -66,7 +71,7 @@ struct Connectivity {
         // Quartus connects ports that sit on the same point, even without a wire.
         // Generated netlists have no geometry.
         var byPoint: [String: Int] = [:]
-        for c in project.components where !project.isFlatNetlist {
+        for c in project.components where geometric {
             for i in c.portIndices {
                 let pt = c.portPoint(i)
                 let key = "\(Int(pt.x)),\(Int(pt.y))"
@@ -151,6 +156,10 @@ struct CompiledCircuit {
     var outputs: [Component]
     var gateOrder: [Component]
     var stats: Stats
+    /// Gates the user never drew (library macro internals, default drivers of unconnected block inputs).
+    var generated: Set<UUID> = []
+    /// Hierarchical names of components below the top sheet ("FA:inst2|HA:inst|inst1").
+    var displayNames: [UUID: String] = [:]
 
     struct Stats {
         var gates = 0
@@ -213,19 +222,24 @@ enum Compiler {
         return s.allSatisfy { ($0.isASCII && ($0.isLetter || $0.isNumber)) || $0 == "_" }
     }
 
-    static func compile(_ project: Project, checkLocations: Bool = true) -> (CompiledCircuit?, [Message]) {
+    enum SheetRole { case top, child }
+
+    /// Checks one sheet on its own: names, connections, and (top only) pins and locations.
+    /// `fatal` means the sheet is unusable (structural errors), and nothing after it can run.
+    static func checkSheet(_ project: Project, role: SheetRole = .top, design: DesignProject? = nil,
+                           checkLocations: Bool = true) -> (messages: [Message], fatal: Bool) {
         var msgs: [Message] = []
         func err(_ t: String, _ c: UUID? = nil) { msgs.append(Message(level: .error, text: t, component: c)) }
         func warn(_ t: String, _ c: UUID? = nil) { msgs.append(Message(level: .warning, text: t, component: c)) }
         func info(_ t: String) { msgs.append(Message(level: .info, text: t)) }
 
-        info("Checking \(project.entityName) for device \(project.device) (Cyclone V, DE10-Standard)")
+        if role == .top { info("Checking \(project.entityName) for device \(project.device) (Cyclone V, DE10-Standard)") }
         let structuralErrors = project.structuralErrors
         if !structuralErrors.isEmpty {
             structuralErrors.forEach { err($0) }
-            return (nil, msgs)
+            return (msgs, true)
         }
-        if !project.device.hasPrefix("5C") || !project.device.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }) {
+        if role == .top && (!project.device.hasPrefix("5C") || !project.device.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) })) {
             err("Device '\(project.device)' must be a Cyclone V device code (for example 5CSXFC6D6F31C6)")
         }
         let conn = Connectivity(project)
@@ -233,7 +247,7 @@ enum Compiler {
         let inputs = project.inputPins
         let outputs = project.outputPins
 
-        if inputs.isEmpty { err("The design has no input pins") }
+        if inputs.isEmpty && role == .top { err("The design has no input pins") }
         if outputs.isEmpty { err("The design has no output pins") }
 
         // Names
@@ -306,13 +320,20 @@ enum Compiler {
             if net.drivers.isEmpty {
                 for s in net.sinks {
                     guard let c = project.component(s.comp) else { continue }
+                    let alone = !net.hasExplicitLink && net.ports.count == 1
                     if c.kind == .output { err("Output pin '\(c.name)' is not driven by anything", c.id) }
+                    else if c.kind == .block && alone { continue }   // driven by the pin's default value (see Flattener)
+                    else if c.kind == .macro && alone {
+                        let hint = MacroLibrary.named(c.symbolName)?.unconnectedHint ?? ""
+                        err("Input \(c.portName(s.port)) of \(c.name) (\(c.symbolName)) is not connected. \(hint)", c.id)
+                    }
                     else { err("Input \(c.portName(s.port)) of \(c.name) (\(c.symbolName)) is not connected", c.id) }
                 }
             } else if net.sinks.isEmpty {
                 for d in net.drivers {
                     guard let c = project.component(d.comp) else { continue }
                     if c.kind == .input { warn("Input pin '\(c.name)' does not drive any logic", c.id) }
+                    else if c.kind.isHierarchical { info("Output \(c.portName(d.port)) of \(c.name) (\(c.symbolName)) is not used") }
                     else { warn("Output of \(c.name) (\(c.symbolName)) is not used", c.id) }
                 }
             }
@@ -320,7 +341,7 @@ enum Compiler {
 
         // Locations
         var locSeen: [String: Component] = [:]
-        for p in pins where checkLocations {
+        for p in pins where checkLocations && role == .top {
             guard let loc = p.location?.trimmingCharacters(in: .whitespacesAndNewlines), !loc.isEmpty else {
                 warn("Pin '\(p.name)' has no location assignment. Quartus will pick a random pin, so the switch/LED will not work.", p.id)
                 continue
@@ -330,6 +351,50 @@ enum Compiler {
             locSeen[loc.uppercased()] = p
             if let bp = BoardPin.lookup(loc), bp.isInput != (p.kind == .input) {
                 warn("'\(p.name)' is an \(p.kind == .input ? "input" : "output") but \(loc) is \(bp.label)", p.id)
+            }
+        }
+
+        // Blocks and library macros.
+        for c in project.components where c.kind.isHierarchical {
+            let name = c.symbolName
+            if c.kind == .macro {
+                if MacroLibrary.named(name) == nil { err("Library macro \(name) (\(c.name)) is not available in Quartzite", c.id) }
+                continue
+            }
+            guard let child = design?.sheet(named: name) else {
+                err("Block \(c.name) refers to \(name).bdf, which is not in the project", c.id)
+                continue
+            }
+            for i in c.portIndices {
+                let port = c.portName(i)
+                let match = child.components.contains {
+                    $0.kind.isPin && $0.name.caseInsensitiveCompare(port) == .orderedSame && ($0.kind == .output) == c.isOutputPort(i)
+                }
+                if !match {
+                    err("Port '\(port)' is not in \(child.entityName).bdf. Use File > Create/Update > Create Symbol Files for Current File, then Update Symbol or Block", c.id)
+                }
+            }
+        }
+        return (msgs, false)
+    }
+
+    /// Orders the gates of a flat design (detecting combinational loops) and counts them.
+    /// Multiple drivers that only meet after flattening are reported here.
+    static func elaborateFlat(_ f: FlatDesign) -> (CompiledCircuit?, [Message]) {
+        var msgs: [Message] = []
+        func err(_ t: String, _ c: UUID? = nil) { msgs.append(Message(level: .error, text: t, component: c)) }
+        func info(_ t: String) { msgs.append(Message(level: .info, text: t)) }
+        let project = f.project
+        let conn = Connectivity(project)
+        let inputs = project.inputPins
+        let outputs = project.outputPins
+        if !f.identity {
+            for net in conn.nets where net.drivers.count > 1 {
+                let who = net.drivers.map { d -> String in
+                    guard let c = project.component(d.comp) else { return "?" }
+                    return c.kind.isPin ? "pin '\(c.name)'" : "\(f.displayName(c.id)) (\(c.symbolName)).\(c.portName(d.port))"
+                }
+                err("Net '\(conn.netName(net.id, project: project))' has \(net.drivers.count) drivers: \(who.joined(separator: ", "))", net.drivers.first?.comp)
             }
         }
 
@@ -361,7 +426,7 @@ enum Compiler {
             }
         }
         if order.count < gates.count {
-            let stuck = gates.filter { !order.contains($0.id) }.map { $0.name }
+            let stuck = gates.filter { !order.contains($0.id) }.map { f.displayName($0.id) }
             err("Combinational loop detected through: \(stuck.joined(separator: ", "))", gates.first { !order.contains($0.id) }?.id)
         }
 
@@ -378,20 +443,66 @@ enum Compiler {
             }
         }
 
-        let errors = msgs.filter { $0.level == .error }.count
-        let warnings = msgs.filter { $0.level == .warning }.count
         info("Logic: \(stats.gates) gates (\(stats.inverters) NOT), \(stats.gateInputs) gate inputs, \(inputs.count) input pins, \(outputs.count) output pins")
         info("Cost = gates + gate inputs = \(stats.cost)  (not counting the \(stats.inputInverters) input inverters: \(stats.costWithoutInputInverters))")
-        if errors == 0 {
-            info("Design check passed: \(errors) errors, \(warnings) warnings")
-        } else {
-            msgs.append(Message(level: .error, text: "Design check failed: \(errors) errors, \(warnings) warnings"))
-        }
         let byID = Dictionary(uniqueKeysWithValues: gates.map { ($0.id, $0) })
-        let circuit = errors == 0
-            ? CompiledCircuit(conn: conn, inputs: inputs, outputs: outputs, gateOrder: order.compactMap { byID[$0] }, stats: stats)
-            : nil
+        guard !msgs.contains(where: { $0.level == .error }) else { return (nil, msgs) }
+        var circuit = CompiledCircuit(conn: conn, inputs: inputs, outputs: outputs, gateOrder: order.compactMap { byID[$0] }, stats: stats)
+        circuit.generated = f.generated
+        circuit.displayNames = f.origin.mapValues(\.displayPath)
         return (circuit, msgs)
+    }
+
+    /// Checks every sheet used under the top, flattens the design and elaborates it.
+    static func compile(_ d: DesignProject, checkLocations: Bool = true) -> (CompiledCircuit?, [Message], FlatDesign?) {
+        guard let top = d.top else {
+            return (nil, [Message(level: .error, text: "Top-level entity \"\(d.topLevelEntity)\" is not a file in the project (no \(d.topLevelEntity).bdf)")], nil)
+        }
+        var msgs: [Message] = []
+        func summary() {
+            let errors = msgs.filter { $0.level == .error }.count
+            let warnings = msgs.filter { $0.level == .warning }.count
+            if errors == 0 {
+                msgs.append(Message(level: .info, text: "Design check passed: \(errors) errors, \(warnings) warnings"))
+            } else {
+                msgs.append(Message(level: .error, text: "Design check failed: \(errors) errors, \(warnings) warnings"))
+            }
+        }
+        var fatal = false
+        for name in d.usedSheets() {
+            guard let s = d.sheet(named: name) else { continue }
+            let isTop = s.entityName == top.entityName
+            let (m, f) = checkSheet(s, role: isTop ? .top : .child, design: d, checkLocations: checkLocations)
+            msgs += isTop ? m : m.map { var m = $0; m.sheet = s.entityName; return m }
+            fatal = fatal || f
+        }
+        if fatal { return (nil, msgs, nil) }
+        d.instanceTree().walk { n, path in
+            guard n.recursive, let parent = path.last else { return }
+            msgs.append(Message(level: .error, text: "\(n.entity) contains itself (through \"\((path.dropFirst().map(\.label) + [n.label]).joined(separator: "|"))\"); a design can't instantiate itself",
+                                component: n.instanceID, sheet: parent.entity))
+        }
+        let hierarchical = top.components.contains { $0.kind.isHierarchical }
+        if hierarchical && msgs.contains(where: { $0.level == .error }) {
+            summary()
+            return (nil, msgs, nil)
+        }
+        let (flat, fm) = Flattener.flatten(d)
+        msgs += fm
+        guard let flat else {
+            summary()
+            return (nil, msgs, nil)
+        }
+        let (c, em) = elaborateFlat(flat)
+        msgs += Flattener.remap(em, flat)
+        let errors = msgs.contains { $0.level == .error }
+        summary()
+        return (errors ? nil : c, msgs, flat)
+    }
+
+    static func compile(_ project: Project, checkLocations: Bool = true) -> (CompiledCircuit?, [Message]) {
+        let (c, m, _) = compile(DesignProject(single: project), checkLocations: checkLocations)
+        return (c, m)
     }
 }
 
