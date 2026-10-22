@@ -356,6 +356,38 @@ enum HardwareFlow {
                               roundTripIdentical: same, check: check, failure: failure)
     }
 
+    // MARK: - Checking a .sof from another tool
+
+    /// Checks a .sof compiled elsewhere (Quartus, from the exported project) against the schematic
+    /// with the Assembler's decoder and checks. Quartus folds unrouted LUT inputs into its masks as
+    /// 1, so they are assumed to read 1 (QZ_FLOAT_INPUT overrides).
+    static func verifyForeignSOF(project p: Project, sof url: URL, config: HardwareConfig) throws -> BitstreamCheck {
+        let state = CompileFlow.run(p, stages: [.analysisSynthesis, .fitter])
+        guard !state.failed, let circuit = state.circuit, let fit = state.fit else {
+            throw Failure(message: "the schematic does not compile" + (state.messages.first { $0.level == .error }.map { ": \($0.text)" } ?? ""))
+        }
+        let unplaced = fit.io.filter { !$0.assignedByUser }.map { $0.name }
+        guard unplaced.isEmpty else {
+            throw Failure(message: "no location assignment for \(unplaced.joined(separator: ", ")); the check needs the pins the .sof was compiled with")
+        }
+        let sof = try SOFFile(contentsOf: url)
+        try sof.validate()
+        guard let dev = CycloneVSX120F.part(sof.device ?? ""), dev == CycloneVSX120F.part(p.device) else {
+            throw Failure(message: "the .sof is for \(sof.device ?? "an unknown device"), the project for \(p.device)")
+        }
+        let work = config.workDir(p.entityName)
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        let base = url.deletingPathExtension().lastPathComponent
+        let rbfURL = work.appendingPathComponent("\(base)_from_sof.rbf")
+        try sof.extractRBF().write(to: rbfURL, options: .atomic)
+        var c = config
+        c.device = dev
+        let (bt, _) = try decompile(rbfURL, to: work.appendingPathComponent("\(base)_from_sof.bt"), config: c)
+        var s = spec(circuit, fit: fit, synthesis: state.synthesis)
+        s.unroutedInputsRead = 1
+        return BitstreamVerifier.check(bt, spec: s)
+    }
+
     // MARK: - Marker file next to a Quartzite .sof
 
     static func markerURL(_ sof: URL) -> URL { sof.deletingLastPathComponent().appendingPathComponent(sof.lastPathComponent + ".quartzite.txt") }

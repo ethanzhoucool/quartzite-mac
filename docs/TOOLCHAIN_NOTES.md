@@ -244,6 +244,11 @@ input, a deleted route, a wrong expected function), which must all be caught.
 - On a Quartus 18.1 `.sof` for this part, the bitstream Quartzite extracts decodes with
   `mistral-cv` and passes `verify_rbf.py` with `QZ_FLOAT_INPUT=1` (unrouted ALM inputs
   read as 1, which is how Quartus leaves them).
+- `Quartzite --sof-verify <file.qzproj> <file.sof>` runs the Assembler's bitstream check on
+  a `.sof` from Quartus. Every pin needs a location assignment. Unrouted LUT inputs are
+  assumed to read 1 and the summary says "verified assuming unrouted LUT inputs read 1"
+  (`QZ_FLOAT_INPUT=0|1` overrides). Quartzite's own bitstreams are still checked with every
+  value of an unrouted input.
 
 ## Open problems / NOT verified
 

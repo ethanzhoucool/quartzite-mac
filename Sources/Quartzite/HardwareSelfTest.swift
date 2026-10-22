@@ -246,13 +246,24 @@ enum HardwareSelfTest {
         check(ok.configuredALMs == 3 && ok.configuredLABs == 3, "3 ALMs configured (logic + nextpnr's two constant drivers)")
         let wrong = BitstreamVerifier.check(bt, spec: demoSpec([2, 3, 6, 7, 9, 13]))
         check(!wrong.passed && wrong.rowsMatching == 15, "a different expected function is caught (15/16 rows)")
-        func mutated(_ f: (String) -> String) -> BitstreamCheck? {
-            (try? DecodedBitstream(text: f(demoBT))).map { BitstreamVerifier.check($0, spec: demoSpec()) }
+        func mutated(_ spec: BitstreamVerifier.Spec = demoSpec(), _ f: (String) -> String) -> BitstreamCheck? {
+            (try? DecodedBitstream(text: f(demoBT))).map { BitstreamVerifier.check($0, spec: spec) }
         }
         let flip = mutated { $0.replacingOccurrences(of: "ffffffff.ffcc00f3", with: "ffffffff.ffcc00f0") }
         check(flip.map { !$0.passed && $0.rowsMatching == 15 } == true, "one flipped LUT entry gives 15/16 rows")
         let half = mutated { $0.replacingOccurrences(of: "ffffffff.ffcc00f3", with: "ffffffff.ffcc00f2") }
         check(half.map { !$0.passed && $0.evaluationError?.contains("unrouted input") == true } == true, "a LUT that depends on an unrouted input is refused")
+        // Quartus folds unrouted LUT inputs into its masks as 1 and leaves the entries they cannot reach at 0.
+        var readsOne = demoSpec()
+        readsOne.unroutedInputsRead = 1
+        let quartusLike = { (s: String) in s.replacingOccurrences(of: "ffffffff.ffcc00f3", with: "ffffffff.ffcc00f1") }
+        let foreign = mutated(readsOne, quartusLike)
+        check(foreign.map { $0.passed && $0.rowsMatching == 16 && $0.summary.hasSuffix("(verified assuming unrouted LUT inputs read 1)") } == true,
+              "a foreign bitstream is verified assuming unrouted LUT inputs read 1")
+        let strict = mutated(demoSpec(), quartusLike)
+        check(strict.map { !$0.passed && $0.evaluationError?.contains("unrouted input") == true } == true, "Quartzite's own check still refuses that LUT")
+        let reached = mutated(readsOne) { $0.replacingOccurrences(of: "ffffffff.ffcc00f3", with: "ffffffff.ffcc00f2") }
+        check(reached.map { !$0.passed && $0.rowsMatching == 15 } == true, "with unrouted inputs reading 1, a flipped entry they reach gives 15/16 rows")
         let cut = mutated { $0.replacingOccurrences(of: "r TD.088.021.0044 LAB.088.021.0:B\n", with: "") }
         check(cut.map { !$0.passed } == true, "a deleted route is caught")
         let oe = mutated { $0 + "\ni GPIO.089.025.3:OEIN.0 1 ; AC30" }

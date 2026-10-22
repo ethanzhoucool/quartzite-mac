@@ -66,6 +66,28 @@ enum CLI {
         return state.failed ? 1 : 0
     }
 
+    /// `--sof-verify <file.qzproj> <file.sof> [--work <dir>]`: decodes a .sof from another tool
+    /// (Quartus) with mistral-cv and checks its pins and truth table against the schematic.
+    static func verifyForeignSOF(project: String, sof: String, work: String?) throws -> Int32 {
+        let p = try JSONDecoder().decode(Project.self, from: Data(contentsOf: URL(fileURLWithPath: project)))
+        let search = Toolchain.locate()
+        guard let tc = search.toolchain else { throw HardwareFlow.Failure(message: "the check needs mistral-cv. \(search.summary)") }
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("quartzite-sof-verify-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        var c = HardwareConfig(toolchain: tc, outputDirectory: tmp)
+        c.workDirectory = work.map { URL(fileURLWithPath: $0, isDirectory: true) } ?? tmp
+        let check = try HardwareFlow.verifyForeignSOF(project: p, sof: URL(fileURLWithPath: sof), config: c)
+        for pin in check.pins {
+            print("\(pin.ok ? "Info" : "Error"): \(pin.isInput ? "input" : "output") \"\(pin.name)\" at PIN_\(pin.pin): \(pin.note)" + (pin.isInput || !pin.ok ? "" : pin.drive.map { " (\($0))" } ?? ""))
+        }
+        if !check.strayDrivenPins.isEmpty {
+            print("Error: output drivers are enabled on pins that are not design outputs: \(check.strayDrivenPins.joined(separator: ", "))")
+        }
+        check.mismatches.forEach { print("Error: \($0)") }
+        print(check.summary)
+        return check.passed ? 0 : 1
+    }
+
     /// Returns the process exit code.
     static func run(_ args: [String]) -> Int32 {
         setvbuf(stdout, nil, _IOLBF, 0)   // line-buffered so progress shows up in CI logs and pipes
@@ -108,6 +130,10 @@ enum CLI {
                     return state.failed ? 1 : 0
                 }
                 return compileToSOF(p, sof: URL(fileURLWithPath: sofPath), args: args, value: value)
+            }
+            if let i = args.firstIndex(of: "--sof-verify"), i + 2 < args.count, args[i + 1].hasSuffix(".qzproj") {
+                // Quartzite --sof-verify <file.qzproj> <file.sof> [--work <dir>]: a .sof from Quartus against the schematic
+                return try verifyForeignSOF(project: args[i + 1], sof: args[i + 2], work: value(after: "--work"))
             }
             if let dir = value(after: "--sof-verify") {
                 // Quartzite --sof-verify <samples dir>: real-file SOF/RBF checks (see ci/sof_check.sh)
@@ -154,7 +180,7 @@ enum CLI {
             FileHandle.standardError.write(Data("error: \(error.localizedDescription)\n".utf8))
             return 1
         }
-        print("usage: Quartzite --selftest [dir] | --sof-info <f.sof> | --sof-to-rbf <in.sof> <out.rbf> [--compressed] | --rbf-to-sof <in.rbf> <device> <out.sof> [--template f.sof] [--layout 14|16|17] [--project name] [--compiler-version s] | --compile <file.qzproj> [--report] [--sof <out.sof> [--layout 14|16|17] [--work dir] [--seed n]] | --export-suite <dir> | --export-project <file.qzproj> <dir>")
+        print("usage: Quartzite --selftest [dir] | --sof-info <f.sof> | --sof-to-rbf <in.sof> <out.rbf> [--compressed] | --rbf-to-sof <in.rbf> <device> <out.sof> [--template f.sof] [--layout 14|16|17] [--project name] [--compiler-version s] | --compile <file.qzproj> [--report] [--sof <out.sof> [--layout 14|16|17] [--work dir] [--seed n]] | --sof-verify <samples dir> | --sof-verify <file.qzproj> <file.sof> [--work dir] | --export-suite <dir> | --export-project <file.qzproj> <dir>")
         return 2
     }
 }

@@ -13,7 +13,9 @@ import Foundation
 /// TMODE=D_E, BMODE=C_E): E selects the half, C/D swap between bit 2 and bit 3 in the upper
 /// half. Inputs are inverted and the mask is stored complemented: out = ~MASK[addr(~inputs)].
 /// MLAB masks are permuted. An unrouted ALM input must not change the result (every value is
-/// tried), so the check does not depend on what an unconnected input reads on silicon.
+/// tried), so the check does not depend on what an unconnected input reads on silicon. Quartus
+/// folds unrouted inputs into its masks as 1, so foreign bitstreams are checked with them
+/// reading 1 (`Spec.unroutedInputsRead`).
 struct DecodedBitstream {
     struct SettingKey: Hashable { var block: String; var mux: String; var index: Int }
     struct Inversion { var value: String; var pin: String; var alias: String }
@@ -165,6 +167,8 @@ struct BitstreamCheck {
     var outputRowsCorrect: [Int] = []
     var mismatches: [String] = []
     var evaluationError: String?
+    /// What unrouted LUT inputs were assumed to read (nil: every value was tried).
+    var unroutedInputsRead: Int?
     var almHalves: [ALMHalf] = []
     var configuredALMs = 0
     var configuredLABs = 0
@@ -174,8 +178,9 @@ struct BitstreamCheck {
     var pinsOK: Int { pins.filter { $0.ok }.count }
 
     var summary: String {
-        if let e = evaluationError { return "FAILED: \(e)" }
-        return (passed ? "Passed" : "FAILED") + ": \(pinsOK)/\(pins.count) pins, \(rowsMatching)/\(rows) truth-table rows match the schematic simulation"
+        let assumed = unroutedInputsRead.map { " (\(passed ? "verified" : "checked") assuming unrouted LUT inputs read \($0))" } ?? ""
+        if let e = evaluationError { return "FAILED: \(e)" + assumed }
+        return (passed ? "Passed" : "FAILED") + ": \(pinsOK)/\(pins.count) pins, \(rowsMatching)/\(rows) truth-table rows match the schematic simulation" + assumed
     }
 }
 
@@ -185,11 +190,17 @@ enum BitstreamVerifier {
         var outputs: [(name: String, pin: String)]
         /// Inputs no output depends on (allowed to have no route).
         var unusedInputs: Set<String> = []
+        /// What unrouted LUT inputs read: nil tries every value (Quartzite's own bitstreams must not
+        /// depend on it), 1 for foreign bitstreams as Quartus assumes. QZ_FLOAT_INPUT=0|1 overrides it.
+        var unroutedInputsRead: Int? = nil
         /// Expected output values for a row index.
         var expected: (Int) -> [Bool]
     }
 
     static func strip(_ pin: String) -> String { pin.hasPrefix("PIN_") ? String(pin.dropFirst(4)) : pin }
+
+    /// QZ_FLOAT_INPUT=0|1 pins unrouted ALM inputs to that value, whatever the spec says.
+    static var floatOverride: Int? { ProcessInfo.processInfo.environment["QZ_FLOAT_INPUT"].flatMap { $0 == "0" ? 0 : ($0 == "1" ? 1 : nil) } }
 
     static func check(_ bt: DecodedBitstream, spec: Spec) -> BitstreamCheck {
         var r = BitstreamCheck()
@@ -252,8 +263,10 @@ enum BitstreamVerifier {
         }
 
         // Truth table.
+        let float = floatOverride ?? spec.unroutedInputsRead
+        r.unroutedInputsRead = float
         do {
-            let net = try Netlist(bt, inputs: inNodes)
+            let net = try Netlist(bt, inputs: inNodes, fixedFloat: float)
             let outs = try spec.outputs.indices.map { k -> Netlist.Ref? in
                 guard let n = outNodes[k] else { return nil }
                 return try net.resolve(n)
@@ -319,12 +332,13 @@ enum BitstreamVerifier {
         private var halfIndex: [String: Int] = [:]
         private var building: Set<String> = []
         private var memo: [Int8] = []
-        /// QZ_FLOAT_INPUT=0|1 pins unrouted ALM inputs to that value; by default every value is tried.
-        let fixedFloat: Int? = ProcessInfo.processInfo.environment["QZ_FLOAT_INPUT"].flatMap { $0 == "0" ? 0 : ($0 == "1" ? 1 : nil) }
+        /// The value of unrouted ALM inputs; nil tries every value.
+        let fixedFloat: Int?
 
-        init(_ bt: DecodedBitstream, inputs: [String: Int]) throws {
+        init(_ bt: DecodedBitstream, inputs: [String: Int], fixedFloat: Int? = nil) throws {
             self.bt = bt
             self.inputs = inputs
+            self.fixedFloat = fixedFloat
         }
 
         var usedHalves: Set<BitstreamCheck.ALMHalf> { Set(halves.map { $0.info }) }
