@@ -147,14 +147,14 @@ final class ProcessCancel: @unchecked Sendable {
     }
 
     /// Registers a process about to run; false if cancellation already happened.
-    fileprivate func attach(_ p: Process) -> Bool {
+    func attach(_ p: Process) -> Bool {
         lock.lock(); defer { lock.unlock() }
         if cancelled { return false }
         running = p
         return true
     }
 
-    fileprivate func detach() { lock.lock(); running = nil; lock.unlock() }
+    func detach() { lock.lock(); running = nil; lock.unlock() }
 }
 
 /// Runs one external tool with Foundation `Process` (works on macOS and Linux), merging
