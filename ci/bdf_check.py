@@ -15,8 +15,15 @@ rotated/flipped symbol with all coordinates already transformed plus one tag:
 and swaps the end points of arcs when mirroring. `bdf_check.py --geometry <file.bdf>...`
 runs only this geometry check, which is how the tables and the convention were
 verified against .bdf files saved by real Quartus (II 13 to Prime 20).
+
+A design folder may hold several .bdf files (one per entity) and their .bsf symbols.
+The check flattens the hierarchy from the top-level entity (expected.json "top", else
+"entity"), checks block symbols against rules R2-R7 of the hierarchy plan and their .bsf,
+VCC/GND and the 7447 against the Quartus symbol text, the .qsf file list, top-level entity
+and pin assignments, then simulates with its own 7447 model.
+`bdf_check.py --bsf <file.bsf>...` checks .bsf files on their own (R1-R8).
 """
-import json, re, sys, itertools, pathlib
+import json, os, re, sys, itertools, pathlib
 
 def tokenize(s):
     s = re.sub(r'/\*.*?\*/', '', s, flags=re.S)
@@ -171,63 +178,222 @@ def geometry_problems(tree, strict_pins=True):
         if got != want: problems.append(f"{label}: drawing differs from the Quartus library ({tag})")
     return problems, checked
 
-def check(folder):
-    folder = pathlib.Path(folder)
-    exp = json.loads((folder / 'expected.json').read_text())
-    tree = parse(tokenize((folder / f"{exp['entity']}.bdf").read_text()))
-    geo, _ = geometry_problems(tree)
-    if geo:
-        return False, geo
+# ---------------------------------------------------------------------------
+# Hierarchical designs: several .bdf files, block symbols (.bsf), VCC/GND and the
+# 7447 library macro.
+
+HERE = pathlib.Path(__file__).resolve().parent
+FIXTURES = pathlib.Path(os.environ.get('QUARTZITE_FIXTURES') or HERE / 'fixtures' / 'quartus18')
+
+# 7447 (others > maxplus2), written independently from the plan's section 3 table.
+# A segment output is 1 when the segment is off. n = 8D + 4C + 2B + A.
+SEG_OFF_7447 = {'a': {1, 4, 6, 10, 11, 12, 14, 15}, 'b': {5, 6, 10, 11, 13, 14, 15},
+                'c': {2, 10, 12, 13, 14, 15}, 'd': {1, 4, 7, 9, 12, 15},
+                'e': {1, 3, 4, 5, 7, 9, 11, 12, 13, 15}, 'f': {1, 2, 3, 7, 10, 11, 15}, 'g': {0, 1, 7, 15}}
+
+def ttl7447(v):
+    n = v['A'] + 2 * v['B'] + 4 * v['C'] + 8 * v['D']
+    zero_blank = bool(v['LTN'] and not v['RBIN'] and n == 0)
+    out = {}
+    for seg in 'abcdefg':
+        if not v['BIN']: out['O' + seg.upper()] = True
+        elif not v['LTN']: out['O' + seg.upper()] = False
+        else: out['O' + seg.upper()] = zero_blank or n in SEG_OFF_7447[seg]
+    out['RBON'] = not zero_blank      # provisional: independent of BIN (CT-1 7447 probe)
+    return out
+
+MACROS = {'7447': ttl7447}
+
+# GND is PROVISIONAL until CT-0b P1-4 captures a Quartus 18 GND; it matches Quartzite's.
+GND_TEXT = """(symbol
+	(rect 0 0 32 32)
+	(text "GND" (rect 8 16 29 26)(font "Arial" (font_size 6)))
+	(text "inst" (rect 3 21 26 33)(font "Arial" )(invisible))
+	(port
+		(pt 16 0)
+		(output)
+		(text "1" (rect 18 0 26 12)(font "Courier New" (bold))(invisible))
+		(text "1" (rect 18 0 26 12)(font "Courier New" (bold))(invisible))
+		(line (pt 16 8)(pt 16 0))
+	)
+	(drawing
+		(line (pt 8 8)(pt 16 16))
+		(line (pt 16 16)(pt 24 8))
+		(line (pt 8 8)(pt 24 8))
+	)
+)"""
+
+def _first_symbol(text):
+    return [i for i in parse(tokenize(text)) if isinstance(i, list) and i and i[0] == 'symbol'][0]
+
+def _reference(name):
+    if name == 'VCC': return _first_symbol((FIXTURES / 'lab2' / 'vcc_symbol.txt').read_text())
+    if name == 'GND': return _first_symbol(GND_TEXT)
+    if name == '7447': return _first_symbol((FIXTURES / 'lab2' / 'sym7447_template.txt').read_text())
+    return None
+
+def normalized(sym, keep_instance_rect=False):
+    """A symbol without its placement: the rect becomes its size and the instance string is
+    dropped (with its rect too, unless keep_instance_rect)."""
+    texts = [i for i, c in enumerate(sym) if isinstance(c, list) and c and c[0] == 'text']
+    out = []
+    for i, c in enumerate(sym):
+        if isinstance(c, list) and c and c[0] == 'rect' and i == 1:
+            out.append(['size', int(c[3]) - int(c[1]), int(c[4]) - int(c[2])])
+        elif len(texts) > 1 and i == texts[1]:
+            if keep_instance_rect: out.append(['text', ''] + c[2:])
+        else:
+            out.append(c)
+    return out
+
+def rect_of(node):
+    r = find(node, 'rect')[0]
+    return tuple(int(v) for v in r[1:5])
+
+def font_of(text):
+    f = find(text, 'font')
+    if not f: return None
+    size = find(f[0], 'font_size')
+    return (f[0][1], int(size[0][1]) if size else None)
+
+def round_up16(v):
+    return (v + 15) // 16 * 16
+
+def block_rules(sym, bsf=False):
+    """Rules R2-R7 (and the width bounds for a .bsf) for a block symbol, with each text width
+    read from the port's or name's first text rect."""
+    probs = []
+    x0, y0, x1, y1 = rect_of(sym)
+    W, H = x1 - x0, y1 - y0
+    B = H - 16
+    name = find(sym, 'text')[0][1] if find(sym, 'text') else '?'
+    def bad(m): probs.append(f"{name}: {m}")
+    if bsf and (x0, y0) != (16, 16): bad(f"R2 rect starts at {(x0, y0)}, expected (16, 16)")
+    texts = find(sym, 'text')
+    if len(texts) < 2:
+        bad("missing name or instance text"); return probs
+    nt, it = texts[0], texts[1]
+    tw = rect_of(nt)[2] - rect_of(nt)[0]
+    if rect_of(nt) != (5, 0, 5 + tw, 19) or font_of(nt) != ('Intel Clear', 8): bad(f"R6 name text {rect_of(nt)} {font_of(nt)}")
+    iw = rect_of(it)[2] - rect_of(it)[0]
+    if rect_of(it) != (8, B - 5, 8 + iw, B + 12) or font_of(it) != ('Intel Clear', None): bad(f"R7 instance text {rect_of(it)} {font_of(it)}")
+    ports = find(sym, 'port')
+    dirs = ['output' if find(p, 'output') else 'input' for p in ports]
+    if dirs != sorted(dirs, key=lambda d: d == 'output'): bad("R3 inputs must come before outputs")
+    k = {'input': 0, 'output': 0}
+    widths = {'input': [0], 'output': [0]}
+    for port, d in zip(ports, dirs):
+        y = 32 + 16 * k[d]; k[d] += 1
+        pn = find(port, 'text')[0][1] if find(port, 'text') else '?'
+        x = 0 if d == 'input' else W
+        if pt(find(port, 'pt')[0]) != (x, y): bad(f"R3 port {pn} at {pt(find(port, 'pt')[0])}, expected {(x, y)}")
+        lines = find(port, 'line')
+        lead = {(x, y), (16 if d == 'input' else W - 16, y)}
+        if not lines or set(pt(q) for q in find(lines[0], 'pt')) != lead: bad(f"R3 port {pn} lead")
+        t = find(port, 'text')
+        if len(t) != 2 or t[0][1] != t[1][1]: bad(f"R4 port {pn} needs two texts with its name"); continue
+        ptw = rect_of(t[0])[2]
+        widths[d].append(ptw)
+        if rect_of(t[0]) != (0, 0, ptw, 19) or font_of(t[0]) != ('Intel Clear', 8): bad(f"R4 port {pn} first text {rect_of(t[0])}")
+        want = (21, y - 5, 21 + ptw, y + 14) if d == 'input' else (W - 21 - ptw, y - 5, W - 21, y + 14)
+        if rect_of(t[1]) != want or font_of(t[1]) != ('Intel Clear', 8): bad(f"R4 port {pn} label {rect_of(t[1])}, expected {want}")
+    drawing = find(sym, 'drawing')
+    shapes = drawing[0][1:] if drawing else []
+    if len(shapes) != 1 or shapes[0][0] != 'rectangle' or rect_of(shapes[0]) != (16, 16, W - 16, B) or find(shapes[0], 'line_width'):
+        bad(f"R5 body must be one (rectangle (rect 16 16 {W - 16} {B}))")
+    if bsf:
+        s = max(widths['input']) + max(widths['output'])
+        lo, hi = 32 + max(64, round_up16(s + 10)), 32 + max(64, round_up16(s + 25))
+        if W % 16 or not lo <= W <= hi: bad(f"R8 width {W} outside {lo}..{hi}")
+    return probs
+
+def bsf_symbol(tree):
+    syms = [i for i in tree if isinstance(i, list) and i and i[0] == 'symbol']
+    return syms[0] if len(syms) == 1 else None
+
+def symbol_problems(tree, fname, bsfs, blocks=None):
+    """VCC/GND and the 7447 against the Quartus text; blocks (a name in `blocks`, or any
+    symbol with a .bsf in `bsfs` when `blocks` is None) against R3-R7 and their .bsf."""
+    problems = []
+    for item in tree:
+        if not (isinstance(item, list) and item and item[0] == 'symbol'): continue
+        name = find(item, 'text')[0][1]
+        if name in ('VCC', 'GND') or name in MACROS:
+            if normalized(item, keep_instance_rect=True) != normalized(_reference(name), keep_instance_rect=True):
+                problems.append(f"{fname}: {name} {find(item, 'text')[1][1]} differs from the Quartus symbol")
+        elif name.lower() in (blocks if blocks is not None else bsfs):
+            problems += [f"{fname}: {m}" for m in block_rules(item)]
+            b = bsfs.get(name.lower())
+            sym = bsf_symbol(b) if b is not None else None
+            if sym is None: problems.append(f"{fname}: no {name}.bsf for block {name}")
+            elif normalized(item) != normalized(sym): problems.append(f"{fname}: block {name} differs from {name}.bsf")
+    return problems
+
+def bsf_problems(path):
+    """--bsf: R1-R8 for one .bsf file."""
+    raw = pathlib.Path(path).read_bytes()
+    probs = []
+    if raw.replace(b'\r\n', b'').count(b'\n') or not raw.endswith(b'\r\n'): probs.append("R1 line endings must be CRLF")
+    text = raw.decode('utf-8', errors='replace')
+    if not text.startswith('/*\r\nWARNING: Do NOT edit'): probs.append("R1 must start with the WARNING comment")
+    tree = parse(tokenize(text))
+    heads = [i for i in tree if isinstance(i, list)]
+    if not heads or heads[0] != ['header', 'symbol', ['version', '1.2']]: probs.append('R1 header must be (header "symbol" (version "1.2"))')
+    syms = [i for i in heads if i[0] == 'symbol']
+    if len(syms) != 1: probs.append(f"R1 needs exactly one symbol, found {len(syms)}"); return probs
+    return probs + block_rules(syms[0], bsf=True)
+
+def sheet_netlist(tree):
+    """Pins, symbols (port directions from (input)/(output)) and the local nets of one .bdf."""
     parent = {}
     def node(k):
         parent.setdefault(k, k); return k
     def root(k):
+        node(k)
         while parent[k] != k:
             parent[k] = parent[parent[k]]; k = parent[k]
         return k
     def join(a, b):
-        ra, rb = root(node(a)), root(node(b))
+        ra, rb = root(a), root(b)
         if ra != rb: parent[ra] = rb
-
-    points = {}     # absolute point -> list of node keys at that point
-    pins, gates, segs = [], [], []
+    points, pins, symbols, segs = {}, [], [], []
     junctions = 0
     def at(p, key):
         node(key); points.setdefault(p, []).append(key)
-
     for item in tree:
         if not isinstance(item, list): continue
         if item[0] == 'pin':
             direction = 'input' if find(item, 'input') else 'output'
-            r = find(item, 'rect')[0]; x0, y0 = int(r[1]), int(r[2])
-            name = find(item, 'text')[1][1]
+            x0, y0 = rect_of(item)[:2]
+            texts = find(item, 'text')
+            name = texts[1][1]
+            default = texts[2][1].upper() if direction == 'input' and len(texts) > 2 else 'VCC'
             p = pt(find(item, 'pt')[0]); p = (x0 + p[0], y0 + p[1])
             key = ('pin', name)
-            pins.append((name, direction, key))
+            pins.append((name, direction, key, default))
             at(p, key); join(key, ('name', name.lower()))
         elif item[0] == 'symbol':
-            r = find(item, 'rect')[0]; x0, y0 = int(r[1]), int(r[2])
-            prim = find(item, 'text')[0][1]
-            inst = find(item, 'text')[1][1]
+            x0, y0 = rect_of(item)[:2]
+            texts = find(item, 'text')
+            sym, inst = texts[0][1], texts[1][1]
             ports = {}
             for port in find(item, 'port'):
                 p = pt(find(port, 'pt')[0]); p = (x0 + p[0], y0 + p[1])
                 pname = find(port, 'text')[0][1]
                 key = ('port', inst, pname)
-                ports[pname] = key
+                ports[pname] = (key, 'output' if find(port, 'output') else 'input')
                 at(p, key)
-            gates.append((inst, prim, ports))
+            symbols.append({'inst': inst, 'name': sym, 'ports': ports, 'item': item})
         elif item[0] == 'connector':
-            ps = [pt(p) for p in find(item, 'pt')]
+            ps = [pt(q) for q in find(item, 'pt')]
             key = ('seg', len(segs))
             segs.append((ps[0], ps[1], key))
-            for p in ps: at(p, key)
+            for q in ps: at(q, key)
             texts = find(item, 'text')
             if texts: join(key, ('name', texts[0][1].lower()))
         elif item[0] == 'junction':
             junctions += 1
             at(pt(find(item, 'pt')[0]), ('junction', junctions))
-
     for p, keys in points.items():
         for k in keys[1:]: join(keys[0], k)
     # endpoints (and junctions) lying on another connector's interior connect to it
@@ -241,52 +407,192 @@ def check(folder):
                 # Quartus only joins a T when a junction or connector endpoint sits there
                 if any(k[0] in ('seg', 'junction') for k in keys):
                     join(keys[0], key)
+    members = {}
+    for k in list(parent): members.setdefault(root(k), []).append(k)
+    return {'pins': pins, 'symbols': symbols, 'root': root, 'members': members}
 
-    gate_index = {g[0]: g for g in gates}
-    ins = [p for p in pins if p[1] == 'input']
-    outs = [p for p in pins if p[1] == 'output']
-    by_name = {p[0]: p for p in pins}
+def classify(name, sheets):
+    if name in PRIMS: return 'primitive'
+    if name in ('VCC', 'GND'): return 'constant'
+    if name in MACROS: return 'macro'
+    if name.lower() in sheets: return 'block'
+    return None
+
+def check_folder(folder):
+    """Flattens every .bdf in a bundle from the top, checks the symbols, the .qsf and the
+    drivers, then simulates every input row against expected.json."""
+    folder = pathlib.Path(folder)
+    exp = json.loads((folder / 'expected.json').read_text())
+    top = exp.get('top', exp['entity'])
+    sheets = {f.stem.lower(): (f.name, parse(tokenize(f.read_text()))) for f in sorted(folder.glob('*.bdf'))}
+    bsfs = {f.stem.lower(): parse(tokenize(f.read_text())) for f in sorted(folder.glob('*.bsf'))}
+    if top.lower() not in sheets: return False, [f"no {top}.bdf"]
+    problems = []
+    # Geometry: primitives and pins, then VCC/GND, the 7447 and blocks.
+    for stem, (fname, tree) in sheets.items():
+        geo, _ = geometry_problems(tree)
+        problems += [f"{fname}: {g}" for g in geo]
+        problems += symbol_problems(tree, fname, bsfs, blocks=sheets)
+    for stem, b in bsfs.items():
+        sym = bsf_symbol(b)
+        problems += [f"{stem}.bsf: {m}" for m in (block_rules(sym, bsf=True) if sym else ['needs exactly one symbol'])]
+    if problems: return False, problems
+
+    # Flatten.
+    parent = {}
+    def froot(k):
+        parent.setdefault(k, k)
+        while parent[k] != k:
+            parent[k] = parent[parent[k]]; k = parent[k]
+        return k
+    def fjoin(a, b):
+        ra, rb = froot(a), froot(b)
+        if ra != rb: parent[ra] = rb
+    gates, consts, macros, top_pins, used, used_macros = [], [], [], [], [], []
+    def expand(stem, prefix, bindings, stack):
+        fname, tree = sheets[stem]
+        if fname not in used: used.append(fname)
+        net = sheet_netlist(tree)
+        def fk(k): return (prefix, net['root'](k))
+        def connected(k): return len(net['members'][net['root'](k)]) > 1
+        for name, d, key, default in net['pins']:
+            froot(fk(key))
+            if not prefix:
+                top_pins.append((name, d, fk(key)))
+            elif name.lower() in bindings:
+                fjoin(fk(key), bindings[name.lower()])
+            elif d == 'input':
+                consts.append((fk(key), default != 'GND', '/'.join(prefix) + '/' + name + ' (default)'))
+        for s in net['symbols']:
+            path = '/'.join(prefix + (s['inst'],))
+            kind = classify(s['name'], sheets)
+            ports = s['ports']
+            if kind == 'primitive':
+                ins = [fk(k) for pn, (k, d) in sorted(ports.items()) if d == 'input']
+                outs = [fk(k) for pn, (k, d) in ports.items() if d == 'output']
+                if len(outs) != 1: problems.append(f"{path}: {s['name']} needs one output port"); continue
+                gates.append((path, s['name'], ins, outs[0]))
+            elif kind == 'constant':
+                for pn, (k, d) in ports.items(): consts.append((fk(k), s['name'] == 'VCC', path))
+            elif kind == 'macro':
+                if s['name'] not in used_macros: used_macros.append(s['name'])
+                macros.append((path, s['name'], {pn: fk(k) for pn, (k, d) in ports.items() if d == 'input'},
+                               {pn: fk(k) for pn, (k, d) in ports.items() if d == 'output'}))
+            elif kind == 'block':
+                child = s['name'].lower()
+                if child in stack: problems.append(f"{path}: {s['name']} contains itself"); continue
+                cpins = {n.lower(): d for n, d, _, _ in sheet_netlist(sheets[child][1])['pins']}
+                if cpins != {pn.lower(): d for pn, (k, d) in ports.items()}:
+                    problems.append(f"{path}: ports of {s['name']} differ from the pins of {sheets[child][0]}"); continue
+                expand(child, prefix + (s['inst'],), {pn.lower(): fk(k) for pn, (k, d) in ports.items() if connected(k)}, stack + [child])
+            else:
+                problems.append(f"{path}: unknown symbol {s['name']} (no {s['name']}.bdf in the folder)")
+    expand(top.lower(), (), {}, [top.lower()])
+    if problems: return False, problems
+
+    # The .qsf and the file set.
+    qsfs = [f for f in folder.glob('*.qsf') if not f.name.endswith('_pins.qsf')]
+    if len(qsfs) != 1: problems.append(f"expected one project .qsf, found {[f.name for f in qsfs]}")
+    else:
+        q = qsfs[0].read_text()
+        files = re.findall(r'^set_global_assignment -name BDF_FILE (\S+)', q, re.M)
+        if sorted(files) != sorted(used): problems.append(f"{qsfs[0].name}: BDF_FILE {files}, used {used}")
+        tops = re.findall(r'^set_global_assignment -name TOP_LEVEL_ENTITY (\S+)', q, re.M)
+        if tops != [top]: problems.append(f"{qsfs[0].name}: TOP_LEVEL_ENTITY {tops}, expected {top}")
+        located = re.findall(r'^set_location_assignment \S+ -to (\S+)', q, re.M)
+        names = {n for n, _, _ in top_pins}
+        if set(located) - names: problems.append(f"{qsfs[0].name}: locations for non-top pins {sorted(set(located) - names)}")
+        io = set(re.findall(r'^set_instance_assignment -name IO_STANDARD "[^"]+" -to (\S+)', q, re.M))
+        if set(located) - io: problems.append(f"{qsfs[0].name}: no IO_STANDARD for {sorted(set(located) - io)}")
+    unused = sorted(n for n, _ in sheets.values() if n not in used)
+    if unused: problems.append(f"files not used under {top}: {unused}")
+    if 'files' in exp and sorted(exp['files']) != sorted(used): problems.append(f"expected.json files {exp['files']}, used {used}")
+    if 'symbols' in exp and sorted(exp['symbols']) != sorted(f.name for f in folder.glob('*.bsf')): problems.append("expected.json symbols differ from the .bsf files")
+    if 'macros' in exp and sorted(exp['macros']) != sorted(used_macros): problems.append(f"expected.json macros {exp['macros']}, used {used_macros}")
+
+    # Drivers across the hierarchy.
+    drivers = {}
+    for name, d, key in top_pins:
+        if d == 'input': drivers.setdefault(froot(key), []).append(f"pin {name}")
+    for path, prim, ins, out in gates: drivers.setdefault(froot(out), []).append(path)
+    for key, v, path in consts: drivers.setdefault(froot(key), []).append(path)
+    for path, m, ins, outs in macros:
+        for pn, k in outs.items(): drivers.setdefault(froot(k), []).append(f"{path}.{pn}")
+    problems += [f"net with {len(v)} drivers: {v}" for v in drivers.values() if len(v) > 1]
+    for path, prim, ins, out in gates:
+        for i, k in enumerate(ins):
+            if froot(k) not in drivers: problems.append(f"{path} input {i + 1} undriven")
+    for path, m, ins, outs in macros:
+        for pn, k in ins.items():
+            if froot(k) not in drivers: problems.append(f"{path}.{pn} undriven")
+    for name, d, key in top_pins:
+        if d == 'output' and froot(key) not in drivers: problems.append(f"output {name} undriven")
+    by_name = {n: (n, d, k) for n, d, k in top_pins}
+    if sorted(exp['inputs']) != sorted(n for n, d, _ in top_pins if d == 'input') or sorted(exp['outputs']) != sorted(n for n, d, _ in top_pins if d == 'output'):
+        problems.append("pin set differs from expected.json")
+    if problems: return False, problems
+
+    # Evaluation order (also finds combinational loops).
+    nodes = [('g', g) for g in gates] + [('m', m) for m in macros]
+    produced = {}
+    for i, (kind, n) in enumerate(nodes):
+        for k in ([n[3]] if kind == 'g' else list(n[3].values())): produced[froot(k)] = i
+    deps = [set(produced[froot(k)] for k in (n[2] if kind == 'g' else n[2].values()) if froot(k) in produced) for kind, n in nodes]
+    order, state = [], [0] * len(nodes)
+    def visit(i):
+        if state[i] == 2: return True
+        if state[i] == 1: return False
+        state[i] = 1
+        for j in deps[i]:
+            if not visit(j): return False
+        state[i] = 2; order.append(i); return True
+    sys.setrecursionlimit(max(1000, 4 * len(nodes) + 100))
+    if not all(visit(i) for i in range(len(nodes))): return False, ["combinational loop"]
+
     in_order = [by_name[n] for n in exp['inputs']]
     out_order = [by_name[n] for n in exp['outputs']]
-    assert len(in_order) == len(ins) and len(out_order) == len(outs), "pin set differs from expected.json"
-
-    # every gate input must be driven by exactly one driver
-    drivers = {}
-    for name, d, key in ins: drivers.setdefault(root(key), []).append(key)
-    for inst, prim, ports in gates: drivers.setdefault(root(ports['OUT']), []).append(ports['OUT'])
-    problems = [f"net with {len(v)} drivers: {v}" for v in drivers.values() if len(v) > 1]
-    for inst, prim, ports in gates:
-        for pn, key in ports.items():
-            if pn != 'OUT' and root(key) not in drivers: problems.append(f"{inst}.{pn} undriven")
-    for name, d, key in outs:
-        if root(key) not in drivers: problems.append(f"output {name} undriven")
-    if problems:
-        return False, problems
-
     mismatches = []
     n = len(in_order)
     for i in range(1 << n):
-        val = {}
-        for k, (name, d, key) in enumerate(in_order):
-            val[root(key)] = bool((i >> (n - 1 - k)) & 1)
-        for _ in range(len(gates) + 1):
-            for inst, prim, ports in gates:
-                ins_v = [val.get(root(ports[p])) for p in sorted(ports) if p != 'OUT']
-                if None not in ins_v: val[root(ports['OUT'])] = PRIMS[prim](ins_v)
-        got = ''.join('1' if val.get(root(key)) else '0' for name, d, key in out_order)
+        val = {froot(k): v for k, v, _ in consts}
+        for b, (name, d, key) in enumerate(in_order):
+            val[froot(key)] = bool((i >> (n - 1 - b)) & 1)
+        for j in order:
+            kind, g = nodes[j]
+            if kind == 'g':
+                val[froot(g[3])] = PRIMS[g[1]]([val[froot(k)] for k in g[2]])
+            else:
+                res = MACROS[g[1]]({pn: val[froot(k)] for pn, k in g[2].items()})
+                for pn, k in g[3].items(): val[froot(k)] = res[pn]
+        got = ''.join('1' if val.get(froot(key)) else '0' for name, d, key in out_order)
         if got != exp['rows'][i]: mismatches.append(f"row {i}: bdf gives {got}, expected {exp['rows'][i]}")
     return not mismatches, mismatches
+
+def check(folder):
+    return check_folder(folder)
 
 def strip_attrs(node):
     """Drops styling such as (line_width 1) that some Quartus versions add."""
     if not isinstance(node, list): return node
     return [strip_attrs(c) for c in node if not (isinstance(c, list) and c and c[0] in ('line_width', 'color'))]
 
+if __name__ == '__main__' and sys.argv[1:2] == ['--bsf']:
+    ok_all = True
+    for f in sys.argv[2:]:
+        problems = bsf_problems(f)
+        ok_all &= not problems
+        print(('PASS ' if not problems else 'FAIL ') + f)
+        for m in problems[:10]: print('   ', m)
+    sys.exit(0 if ok_all else 1)
+
 if __name__ == '__main__' and sys.argv[1:2] == ['--geometry']:
     ok_all, total = True, 0
     for f in sys.argv[2:]:
         tree = [strip_attrs(i) for i in parse(tokenize(open(f, errors='replace').read()))]
         problems, n = geometry_problems(tree, strict_pins=False)
+        here = pathlib.Path(f).parent
+        bsfs = {b.stem.lower(): parse(tokenize(b.read_text(errors='replace'))) for b in here.glob('*.bsf')}
+        problems += symbol_problems(tree, pathlib.Path(f).name, bsfs)
         total += n
         ok_all &= not problems
         print(('PASS ' if not problems else 'FAIL ') + f + f" ({n} primitives)")

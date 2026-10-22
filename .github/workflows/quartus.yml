@@ -13,6 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build and test the native editor
+        env: { QUARTZITE_REQUIRE_FIXTURES: '1' }
         run: |
           swift build
           .build/debug/Quartzite --selftest
@@ -27,6 +28,7 @@ jobs:
       - name: Build the command-line exporter
         run: swift build -c release
       - name: Self-test
+        env: { QUARTZITE_REQUIRE_FIXTURES: '1' }
         run: .build/release/Quartzite --selftest
       - name: Export test designs and saved example projects
         run: |
