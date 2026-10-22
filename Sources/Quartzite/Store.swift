@@ -1001,6 +1001,17 @@ final class Store {
         panel.allowedContentTypes = [Store.projectType, .json]
         panel.allowsOtherFileTypes = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        load(url)
+    }
+
+    /// Opens a project handed over by Finder or `open -a Quartzite file.qzproj`.
+    func open(_ url: URL) {
+        guard url != fileURL || dirty else { return }
+        guard confirmDiscard() else { return }
+        load(url)
+    }
+
+    private func load(_ url: URL) {
         do {
             let data = try Data(contentsOf: url)
             loadDesign(try DesignProject.load(data), from: url, dirty: false)

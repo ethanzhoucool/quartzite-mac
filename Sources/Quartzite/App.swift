@@ -20,6 +20,7 @@ struct QuartziteApp: App {
             ContentView(store: store)
                 .frame(minWidth: 1180, minHeight: 720)
                 .navigationTitle(windowTitle)
+                .onAppear { delegate.openFile = { [store] in store.open($0) } }
         }
         .commands { QuartusCommands(store: store) }
     }
@@ -34,10 +35,24 @@ struct QuartziteApp: App {
     }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Loads a project file into the window's store. A file opened at launch, before the
+    /// window exists, waits until this is set.
+    var openFile: ((URL) -> Void)? {
+        didSet { if let openFile, let url = pendingFile { pendingFile = nil; openFile(url) } }
+    }
+    private var pendingFile: URL?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+    }
+    /// Finder double-click, drag onto the Dock icon, or `open -a Quartzite file.qzproj`.
+    /// The window holds one project, so only the last file is opened.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard let url = urls.last else { return }
+        if let openFile { openFile(url) } else { pendingFile = url }
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }
