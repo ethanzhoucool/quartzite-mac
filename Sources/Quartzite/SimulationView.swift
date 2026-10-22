@@ -1,6 +1,12 @@
 #if canImport(SwiftUI)
 import SwiftUI
 
+/// Measured height of the simulation view's input-order and expected-minterm row.
+private struct ExpectedHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 @MainActor
 struct SimulationView: View {
     @Bindable var store: Store
@@ -142,7 +148,9 @@ struct SimulationView: View {
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { expectedHeight = $0 }
+            // GeometryReader + preference rather than onGeometryChange, which needs the macOS 15 SDK.
+            .background(GeometryReader { Color.clear.preference(key: ExpectedHeightKey.self, value: $0.size.height) })
+            .onPreferenceChange(ExpectedHeightKey.self) { expectedHeight = $0 }
         }
         .frame(height: min(expectedHeight, expectedLimit))
     }
