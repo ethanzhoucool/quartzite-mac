@@ -341,11 +341,12 @@ extension DesignProject {
         return updateInstances(of: sheets[i].entityName)
     }
 
-    /// Edit > Update Symbol or Block: gives every instance of `entity` the sheet's current
-    /// symbol. Wires and node names follow their port by name; those on ports that no longer
-    /// exist are removed and reported.
+    /// Edit > Update Symbol or Block: gives every instance of `entity` (or those `include`
+    /// accepts, given the sheet and component IDs) the sheet's current symbol. Wires and node
+    /// names follow their port by name; those on ports that no longer exist are removed and
+    /// reported.
     @discardableResult
-    mutating func updateInstances(of entity: String) -> SymbolUpdateReport {
+    mutating func updateInstances(of entity: String, only include: ((UUID?, UUID) -> Bool)? = nil) -> SymbolUpdateReport {
         var report = SymbolUpdateReport(entity: entity)
         guard let child = sheet(named: entity), let sym = child.symbol else {
             report.error = "\(entity) has no symbol. Use File > Create/Update > Create Symbol Files for Current File first."
@@ -356,6 +357,7 @@ extension DesignProject {
         for si in sheets.indices {
             for ci in sheets[si].components.indices where sheets[si].components[ci].kind == .block {
                 guard let old = sheets[si].components[ci].symbol, old.name.caseInsensitiveCompare(entity) == .orderedSame else { continue }
+                if let include, !include(sheets[si].id, sheets[si].components[ci].id) { continue }
                 report.updatedInstances += 1
                 guard old != sym else { continue }
                 var map: [Int: Int] = [:]

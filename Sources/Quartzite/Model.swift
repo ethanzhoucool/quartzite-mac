@@ -163,7 +163,7 @@ struct Wire: Codable, Identifiable, Hashable {
     var b: PortRef
 }
 
-struct Project: Codable {
+struct Project: Codable, Equatable {
     var name: String = "Lab1"
     var components: [Component] = []
     var wires: [Wire] = []

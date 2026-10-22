@@ -15,6 +15,9 @@ struct PropertySheetView: View {
         case .node(let ref): NodePropertiesSheet(store: store, ref: ref)
         case .newProject: NewProjectWizard(store: store)
         case .device: DeviceSheet(store: store)
+        case .newFile: NewFileSheet(store: store)
+        case .renameSheet(let id): RenameSheetSheet(store: store, id: id)
+        case .updateSymbol: UpdateSymbolSheet(store: store)
         }
     }
 }
@@ -413,6 +416,148 @@ struct DeviceSheet: View {
         }
         .frame(width: 420)
         .onAppear { device = store.design.device }
+    }
+}
+
+// MARK: - File > New
+
+/// Quartus' New dialog: a new project, or a Block Diagram/Schematic File added to this one.
+@MainActor
+struct NewFileSheet: View {
+    @Bindable var store: Store
+    enum Kind: Hashable { case project, schematic }
+    @State private var kind: Kind? = .schematic
+    @State private var name = ""
+    @State private var error: String?
+    @FocusState private var nameFocused: Bool
+
+    var body: some View {
+        SheetFrame(title: "New", okDisabled: kind == nil || (kind == .schematic && problem != nil), onOK: ok,
+                   onCancel: { store.sheet = nil }) {
+            List(selection: $kind) {
+                Label("New Quartus Prime Project", systemImage: "folder.badge.plus").tag(Kind.project)
+                DisclosureGroup(isExpanded: .constant(true)) {
+                    Label("Block Diagram/Schematic File", systemImage: DocTab.bdf.icon).tag(Kind.schematic)
+                } label: { Label("Design Files", systemImage: "folder") }
+            }
+            .frame(width: 380, height: 120)
+            if kind == .schematic {
+                Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
+                    GridRow {
+                        Text("Entity name:")
+                        TextField("", text: $name).textFieldStyle(.roundedBorder).monospaced().focused($nameFocused)
+                            .onSubmit { if problem == nil { ok() } }
+                    }
+                    GridRow {
+                        Text("")
+                        Text(problem ?? error ?? "Adds \(name).bdf to \(store.design.projectName). Its pins become the block's ports once you create its symbol.")
+                            .font(.caption)
+                            .foregroundStyle(problem == nil && error == nil ? Color.secondary : Theme.error)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .frame(width: 420)
+        .onAppear {
+            var k = 1
+            while store.design.sheet(named: "Block\(k)") != nil { k += 1 }
+            name = "Block\(k)"
+            nameFocused = true
+        }
+    }
+
+    private var problem: String? {
+        let n = name.trimmingCharacters(in: .whitespaces)
+        do { try store.design.validateEntityName(n) } catch { return error.localizedDescription }
+        return nil
+    }
+
+    private func ok() {
+        switch kind {
+        case .project?: store.sheet = .newProject
+        case .schematic?:
+            do {
+                try store.newSheet(named: name.trimmingCharacters(in: .whitespaces))
+                store.sheet = nil
+            } catch let e { error = e.localizedDescription }
+        case nil: break
+        }
+    }
+}
+
+// MARK: - Rename a file
+
+/// Project Navigator > Files > Rename...: renames the .bdf, its entity, its symbol and every
+/// block instance of it.
+@MainActor
+struct RenameSheetSheet: View {
+    @Bindable var store: Store
+    var id: UUID
+    @State private var name = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        let old = store.design.sheetIndex(id: id).map { store.design.sheets[$0].entityName } ?? ""
+        SheetFrame(title: "Rename \(old).bdf", okDisabled: problem != nil, onOK: apply, onCancel: { store.sheet = nil }) {
+            TextField("", text: $name).textFieldStyle(.roundedBorder).monospaced().focused($focused)
+                .onSubmit { if problem == nil { apply() } }
+            Text(problem ?? "Block instances of \(old) and its symbol are renamed too.")
+                .font(.caption)
+                .foregroundStyle(problem == nil ? Color.secondary : Theme.error)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(width: 380)
+        .onAppear {
+            name = old
+            focused = true
+        }
+    }
+
+    private var problem: String? {
+        do { try store.design.validateEntityName(name.trimmingCharacters(in: .whitespaces), excluding: id) } catch {
+            return error.localizedDescription
+        }
+        return nil
+    }
+
+    private func apply() {
+        do {
+            try store.renameSheet(id, to: name.trimmingCharacters(in: .whitespaces))
+            store.sheet = nil
+        } catch {
+            store.alert("Could not rename the file", error.localizedDescription)
+        }
+    }
+}
+
+// MARK: - Update Symbol or Block
+
+/// Edit > Update Symbol or Block: which block instances on this sheet get their sheet's
+/// current symbol.
+@MainActor
+struct UpdateSymbolSheet: View {
+    @Bindable var store: Store
+    @State private var scope: Store.SymbolUpdateScope = .all
+
+    var body: some View {
+        SheetFrame(title: "Update Symbol or Block", onOK: {
+            store.updateSymbols(scope)
+            store.sheet = nil
+        }, onCancel: { store.sheet = nil }) {
+            Picker("", selection: $scope) {
+                ForEach(Store.SymbolUpdateScope.allCases) { s in
+                    Text(s.rawValue).tag(s).disabled(s != .all && store.selectedBlockIDs.isEmpty)
+                }
+            }
+            .pickerStyle(.radioGroup)
+            .labelsHidden()
+            Text("Wires and node names stay on ports with the same name. Those on ports the block no longer has are removed.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(width: 420)
+        .onAppear { scope = store.selectedBlockIDs.isEmpty ? .all : .selected }
     }
 }
 

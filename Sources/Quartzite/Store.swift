@@ -43,6 +43,12 @@ enum PropertySheet: Identifiable {
     case node(PortRef)
     case newProject
     case device
+    /// File > New: a project or a Block Diagram/Schematic File.
+    case newFile
+    /// Project Navigator > Files > Rename...
+    case renameSheet(UUID)
+    /// Edit > Update Symbol or Block...
+    case updateSymbol
     var id: String {
         switch self {
         case .symbolLibrary: return "lib"
@@ -51,6 +57,9 @@ enum PropertySheet: Identifiable {
         case .node(let r): return "node\(r.key)"
         case .newProject: return "new"
         case .device: return "device"
+        case .newFile: return "newFile"
+        case .renameSheet(let u): return "rename\(u)"
+        case .updateSymbol: return "updateSymbol"
         }
     }
 }
@@ -58,7 +67,7 @@ enum PropertySheet: Identifiable {
 @MainActor @Observable
 final class Store {
     /// The whole project: every .bdf sheet, the top-level entity and the device.
-    var design = DesignProject(single: Project()) { didSet { designChanged() } }
+    var design = DesignProject(single: Project()) { didSet { designChanged(from: oldValue) } }
     /// The sheet shown in the Block Editor.
     var activeSheetID = UUID() { didSet { if activeSheetID != oldValue { refreshRouting() } } }
     /// Sheets with an open .bdf tab, in tab order.
@@ -67,6 +76,8 @@ final class Store {
     var hierarchyTrail: [(sheet: UUID, instance: UUID)] = []
     var fileURL: URL?
     var dirty = false
+    /// Sheets changed since the last save (their tabs show an asterisk).
+    var dirtySheets: Set<UUID> = []
     var selection: Set<Selection> = []
     var tool: Tool = .select
     var repeatInsert = false
@@ -135,6 +146,7 @@ final class Store {
             openSheetIDs = [activeSheetID]
             fileURL = restored.url
             dirty = restored.dirty ?? true
+            dirtySheets = dirty ? Set(design.sheets.compactMap(\.id)) : []
             suppressChange = false
             refreshRouting()
             systemMessages = [Message(level: .info, text: "Restored your last session")]
@@ -208,9 +220,14 @@ final class Store {
 
     // MARK: - Mutation & undo
 
-    private func designChanged() {
+    private func designChanged(from old: DesignProject) {
         guard !suppressChange else { return }
         dirty = true
+        for s in design.sheets {
+            guard let id = s.id else { continue }
+            if let i = old.sheetIndex(id: id), old.sheets[i] == s { continue }
+            dirtySheets.insert(id)
+        }
         if isProcessing { resetFlow() }
         projectVersion += 1
         compileIsStale = true
@@ -393,6 +410,193 @@ final class Store {
         }
     }
 
+    // MARK: - Sheets and hierarchy
+
+    /// A design edit that may be refused: when `change` throws, nothing changes and no undo
+    /// step is recorded.
+    func tryMutateDesign(_ change: (inout DesignProject) throws -> Void) throws {
+        var d = design
+        try change(&d)
+        mutateDesign { $0 = d }
+    }
+
+    /// The sheet a hierarchy trail leads to: the block placed by its last step.
+    private func sheetID(after trail: [(sheet: UUID, instance: UUID)]) -> UUID? {
+        guard let last = trail.last, let parent = design.sheetIndex(id: last.sheet),
+              let name = design.sheets[parent].component(last.instance)?.symbol?.name else { return nil }
+        return design.sheet(named: name)?.id
+    }
+
+    /// Opens a sheet in its .bdf tab. `trail` lists the block instances (parent sheet and
+    /// instance) from the top down to the sheet, for Hierarchy Up. Without one, a trail that
+    /// passes through the sheet is cut there, and any other trail is dropped.
+    func openSheet(_ id: UUID, trail: [(sheet: UUID, instance: UUID)]? = nil) {
+        guard design.sheetIndex(id: id) != nil else { return }
+        if let trail {
+            hierarchyTrail = trail
+        } else if let k = hierarchyTrail.firstIndex(where: { $0.sheet == id }) {
+            hierarchyTrail = Array(hierarchyTrail[..<k])
+        } else if sheetID(after: hierarchyTrail) != id {
+            hierarchyTrail = []
+        }
+        if !openSheetIDs.contains(id) { openSheetIDs.append(id) }
+        if activeSheetID != id {
+            activeSheetID = id
+            selection = []
+            tool = .select
+            EditorState.shared.editingNote = nil
+            EditorState.shared.status = nil
+        }
+        tab = .bdf
+    }
+
+    func openSheet(named entity: String) {
+        if let id = design.sheet(named: entity)?.id { openSheet(id) }
+    }
+
+    /// Closes a .bdf tab. The last open sheet keeps its tab.
+    func closeSheet(_ id: UUID) {
+        guard openSheetIDs.count > 1, let i = openSheetIDs.firstIndex(of: id) else { return }
+        openSheetIDs.remove(at: i)
+        guard activeSheetID == id else { return }
+        let shown = tab
+        openSheet(openSheetIDs[min(i, openSheetIDs.count - 1)])
+        tab = shown
+    }
+
+    /// Double-click on a block (Quartus: Open Design File): opens the block's sheet and
+    /// remembers the instance for Hierarchy Up.
+    @discardableResult
+    func openBlock(_ instance: UUID) -> Bool {
+        guard let c = project.component(instance), c.kind == .block, let name = c.symbol?.name,
+              let child = design.sheet(named: name)?.id else { return false }
+        let trail = sheetID(after: hierarchyTrail) == activeSheetID ? hierarchyTrail : []
+        openSheet(child, trail: trail + [(activeSheetID, instance)])
+        return true
+    }
+
+    /// Where Hierarchy Up goes: the instance this sheet was opened from, or else the first
+    /// instance of this sheet's block in another sheet.
+    var parentInstance: (sheet: UUID, instance: UUID)? {
+        if let last = hierarchyTrail.last, sheetID(after: hierarchyTrail) == activeSheetID { return last }
+        let name = project.entityName
+        for s in design.sheets where s.id != activeSheetID {
+            guard let sid = s.id else { continue }
+            if let c = s.components.first(where: { $0.kind == .block && $0.symbol?.name.caseInsensitiveCompare(name) == .orderedSame }) {
+                return (sid, c.id)
+            }
+        }
+        return nil
+    }
+
+    /// Hierarchy Up: back to the parent sheet with the block selected.
+    @discardableResult
+    func hierarchyUp() -> Bool {
+        guard let up = parentInstance else { return false }
+        let trail = sheetID(after: hierarchyTrail) == activeSheetID ? Array(hierarchyTrail.dropLast()) : []
+        openSheet(up.sheet, trail: trail)
+        selection = [.comp(up.instance)]
+        return true
+    }
+
+    /// File > New > Block Diagram/Schematic File: adds an empty sheet and opens it.
+    func newSheet(named n: String) throws {
+        var id: UUID?
+        try tryMutateDesign { id = try $0.addSheet(named: n) }
+        guard let id else { return }
+        openSheet(id, trail: [])
+        systemMessages.append(Message(level: .info, text: "Created \(n).bdf"))
+    }
+
+    /// File > Create/Update > Create Symbol Files for Current File, then Update Symbol or
+    /// Block on every instance (as Quartzite always does).
+    @discardableResult
+    func createSymbolFiles(for id: UUID? = nil) -> SymbolUpdateReport {
+        let sid = id ?? activeSheetID
+        var report = SymbolUpdateReport(entity: design.sheetIndex(id: sid).map { design.sheets[$0].entityName } ?? "?")
+        mutateDesign { report = $0.createSymbol(forSheet: sid) }
+        EditorState.shared.status = report.summary
+        systemMessages.append(Message(level: report.error == nil ? .info : .error, text: report.summary))
+        return report
+    }
+
+    /// Choices of Edit > Update Symbol or Block, as in Quartus.
+    enum SymbolUpdateScope: String, CaseIterable, Identifiable {
+        case selected = "Selected symbol(s) or block(s)"
+        case sameName = "All symbols or blocks with the same name"
+        case all = "All symbols or blocks in the file"
+        var id: String { rawValue }
+    }
+
+    /// Block instances on the open sheet that are selected.
+    var selectedBlockIDs: Set<UUID> {
+        Set(selectedComponentIDs.filter { project.component($0)?.kind == .block })
+    }
+
+    /// Edit > Update Symbol or Block: gives block instances on the open sheet their sheet's
+    /// current symbol. Returns the line shown in the status bar.
+    @discardableResult
+    func updateSymbols(_ scope: SymbolUpdateScope) -> String {
+        let here = activeSheetID
+        let picked = selectedBlockIDs
+        let blocks = project.components.filter { $0.kind == .block && (scope == .all || picked.contains($0.id)) }
+        var names: [String] = []
+        for b in blocks {
+            if let n = b.symbol?.name, !names.contains(where: { $0.caseInsensitiveCompare(n) == .orderedSame }) { names.append(n) }
+        }
+        guard !names.isEmpty else {
+            let text = scope == .all ? "\(project.entityName).bdf has no blocks to update" : "Select a block first"
+            EditorState.shared.status = text
+            return text
+        }
+        var reports: [SymbolUpdateReport] = []
+        mutateDesign { d in
+            for n in names {
+                reports.append(d.updateInstances(of: n, only: { sheet, comp in
+                    sheet == here && (scope != .selected || picked.contains(comp))
+                }))
+            }
+        }
+        var parts: [String] = []
+        for r in reports {
+            if let e = r.error { parts.append(e); continue }
+            var s = "\(r.entity): \(r.updatedInstances) instance\(r.updatedInstances == 1 ? "" : "s")"
+            if !r.addedPorts.isEmpty { s += ", new ports \(r.addedPorts.joined(separator: ", "))" }
+            if !r.removedPorts.isEmpty { s += ", removed ports \(r.removedPorts.joined(separator: ", "))" }
+            parts.append(s)
+        }
+        let text = "Updated " + parts.joined(separator: "; ")
+        EditorState.shared.status = text
+        systemMessages.append(Message(level: reports.contains { $0.error != nil } ? .warning : .info, text: text))
+        return text
+    }
+
+    /// Project > Set as Top-Level Entity.
+    func setTopLevel(_ entity: String) {
+        guard design.topLevelEntity.caseInsensitiveCompare(entity) != .orderedSame else { return }
+        do { try tryMutateDesign { try $0.setTop(entity) } } catch {
+            alert("Could not set the top-level entity", error.localizedDescription)
+            return
+        }
+        hierarchyTrail = []
+        let text = "Set \(design.topLevelEntity) as the top-level entity"
+        EditorState.shared.status = text
+        systemMessages.append(Message(level: .info, text: text))
+    }
+
+    /// Project Navigator > Files > Rename...: the .bdf, its entity, symbol and block instances.
+    func renameSheet(_ id: UUID, to n: String) throws {
+        try tryMutateDesign { try $0.renameSheet(id: id, to: n) }
+    }
+
+    /// Project Navigator > Files > Remove File from Project.
+    func removeSheet(_ id: UUID) throws {
+        let name = design.sheetIndex(id: id).map { design.sheets[$0].entityName } ?? "?"
+        try tryMutateDesign { try $0.removeSheet(id: id) }
+        hierarchyTrail = []
+        systemMessages.append(Message(level: .info, text: "Removed \(name).bdf from the project"))
+    }
+
     // MARK: - Clipboard
 
     private struct Fragment: Codable {
@@ -532,6 +736,7 @@ final class Store {
         hierarchyTrail = []
         fileURL = url
         self.dirty = dirty
+        dirtySheets = dirty ? Set(d.sheets.compactMap(\.id)) : []
         suppressChange = false
         undoStack.removeAll(); redoStack.removeAll()
         selection = []
@@ -597,6 +802,7 @@ final class Store {
         try design.encoded().write(to: url, options: .atomic)
         fileURL = url
         dirty = false
+        dirtySheets = []
         autosave()
     }
 

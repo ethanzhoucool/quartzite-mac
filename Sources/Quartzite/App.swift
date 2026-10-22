@@ -47,6 +47,8 @@ enum PaneVisibility {
     static let navigator = "showProjectNavigator"
     static let tasks = "showTasks"
     static let messages = "showMessages"
+    /// Project Navigator view: "Hierarchy" or "Files".
+    static let navigatorView = "navigatorView"
 }
 
 // MARK: - Menus
@@ -59,10 +61,11 @@ struct QuartusCommands: Commands {
     @AppStorage(PaneVisibility.navigator) private var showNavigator = true
     @AppStorage(PaneVisibility.tasks) private var showTasks = true
     @AppStorage(PaneVisibility.messages) private var showMessages = true
+    @AppStorage(PaneVisibility.navigatorView) private var navigatorView = "Hierarchy"
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New...") { store.sheet = .newProject }.keyboardShortcut("n")
+            Button("New...") { store.sheet = .newFile }.keyboardShortcut("n")
             Button("Open...") { store.open() }.keyboardShortcut("o")
             Divider()
             Button("New Project Wizard...") { store.sheet = .newProject }
@@ -71,6 +74,10 @@ struct QuartusCommands: Commands {
         CommandGroup(replacing: .saveItem) {
             Button("Save") { store.save() }.keyboardShortcut("s")
             Button("Save As...") { store.saveAs() }.keyboardShortcut("s", modifiers: [.command, .shift])
+            Divider()
+            Menu("Create/Update") {
+                Button("Create Symbol Files for Current File") { store.tab = .bdf; store.createSymbolFiles() }
+            }
             Divider()
             Button("Export Quartus Project...") { store.exportQuartusProject() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
@@ -87,6 +94,8 @@ struct QuartusCommands: Commands {
             Button("Duplicate") { store.duplicate() }.keyboardShortcut("d")
             Divider()
             Button("Insert Symbol...") { store.tab = .bdf; store.sheet = .symbolLibrary(at: .zero) }
+            Button("Update Symbol or Block...") { store.tab = .bdf; store.sheet = .updateSymbol }
+                .disabled(!store.project.components.contains { $0.kind == .block })
             Menu("Insert Pin") {
                 Button("Input") { store.tab = .bdf; store.tool = .place(.input) }
                 Button("Output") { store.tab = .bdf; store.tool = .place(.output) }
@@ -112,9 +121,14 @@ struct QuartusCommands: Commands {
             Button("Add Starter Pins (w, x, y, z, f)") { store.tab = .bdf; store.insertStarterPins() }
             Button("Export Quartus Project...") { store.exportQuartusProject() }
             Divider()
-            Button("Add/Remove Files in Project...") {}
-                .disabled(true)
-                .help("A Quartzite project has exactly one schematic, \(store.project.entityName).bdf")
+            Button("Set as Top-Level Entity") { store.setTopLevel(store.project.entityName) }
+                .keyboardShortcut("j", modifiers: [.command, .shift])
+                .disabled(store.design.topLevelEntity.caseInsensitiveCompare(store.project.entityName) == .orderedSame)
+            Button("Add/Remove Files in Project...") {
+                navigatorView = "Files"
+                showNavigator = true
+            }
+            .help("Shows the project's files in the Project Navigator. Add a file with File > New > Block Diagram/Schematic File; remove one from its context menu.")
             Button("Revisions...") {}
                 .disabled(true)
                 .help("Quartzite projects have a single revision")
@@ -254,7 +268,7 @@ struct MainToolbar: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            ToolButton("doc.badge.plus", "New (Command-N)") { store.sheet = .newProject }
+            ToolButton("doc.badge.plus", "New (Command-N)") { store.sheet = .newFile }
             ToolButton("folder", "Open Project (Command-O)") { store.open() }
             ToolButton("square.and.arrow.down", "Save (Command-S)") { store.save() }
             separator
@@ -346,9 +360,17 @@ struct EntityField: View {
 
     var body: some View {
         Menu {
-            Button { } label: { Label(store.topProject.entityName, systemImage: "checkmark") }
+            ForEach(store.design.sheets, id: \.id) { s in
+                Button { store.setTopLevel(s.entityName) } label: {
+                    if s.entityName.caseInsensitiveCompare(store.design.topLevelEntity) == .orderedSame {
+                        Label(s.entityName, systemImage: "checkmark")
+                    } else {
+                        Text(s.entityName)
+                    }
+                }
+            }
             Divider()
-            Text("Quartzite projects have one entity, named after the project")
+            Text("Choose the top-level entity (Project > Set as Top-Level Entity)")
         } label: {
             Text(store.topProject.entityName).font(.callout)
         }
@@ -380,55 +402,6 @@ struct PaneHeader<Trailing: View>: View {
         .frame(height: 26)
         .background(.bar)
         .overlay(alignment: .bottom) { Divider() }
-    }
-}
-
-@MainActor
-struct ProjectNavigatorPane: View {
-    @Bindable var store: Store
-    @AppStorage("navigatorView") private var view = "Hierarchy"
-
-    var body: some View {
-        VStack(spacing: 0) {
-            PaneHeader(title: "Project Navigator") {
-                Picker("", selection: $view) {
-                    Text("Hierarchy").tag("Hierarchy")
-                    Text("Files").tag("Files")
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .controlSize(.small)
-                .fixedSize()
-            }
-            List {
-                if view == "Hierarchy" {
-                    Label("Cyclone V: \(store.project.device)", systemImage: "cpu")
-                    row(store.project.entityName, icon: "square.stack.3d.up", indent: 14) { store.tab = .bdf }
-                } else {
-                    row("\(store.project.entityName).bdf", icon: DocTab.bdf.icon) { store.tab = .bdf }
-                    row("Waveform.vwf", icon: DocTab.waveform.icon) { store.tab = .waveform }
-                    row("\(store.project.entityName).qsf", icon: "doc.plaintext") { store.tab = .assignments }
-                    if store.flow?.netlist != nil {
-                        row(NetlistWriter.path(store.project.entityName), icon: "doc.text") {
-                            store.reportSelection = "stage.eda.netlist"
-                            store.tab = .report
-                        }
-                    }
-                }
-            }
-            .listStyle(.plain)
-            .environment(\.defaultMinListRowHeight, 22)
-            .font(.callout)
-        }
-    }
-
-    private func row(_ title: String, icon: String, indent: CGFloat = 0, open: @escaping () -> Void) -> some View {
-        Label(title, systemImage: icon)
-            .padding(.leading, indent)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture(count: 2, perform: open)
-            .help("Double-click to open")
     }
 }
 
@@ -671,28 +644,60 @@ struct DocumentTabBar: View {
     @Bindable var store: Store
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(DocTab.allCases) { t in
-                let selected = store.tab == t
-                Button { store.tab = t } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: t.icon).font(.caption)
-                        Text(t == .report ? "Compilation Report - \(store.topProject.entityName)" : t.title(store.project)).font(.callout)
-                        if t == .bdf && store.dirty { Text("*").foregroundStyle(.secondary) }
-                    }
-                    .padding(.horizontal, 14)
-                    .frame(height: 30)
-                    .background(selected ? Color(nsColor: .controlBackgroundColor) : .clear)
-                    .overlay(alignment: .top) { if selected { Rectangle().fill(Theme.accent).frame(height: 2) } }
-                    .contentShape(Rectangle())
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 0) {
+                ForEach(store.openSheetIDs, id: \.self) { id in
+                    if let s = store.design.sheetIndex(id: id).map({ store.design.sheets[$0] }) { sheetTab(id, s) }
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(selected ? .primary : .secondary)
-                Divider().frame(height: 30)
+                ForEach(DocTab.allCases.filter { $0 != .bdf }) { t in
+                    tab(selected: store.tab == t, icon: t.icon,
+                        title: t == .report ? "Compilation Report - \(store.topProject.entityName)" : t.title(store.project),
+                        dirty: false, close: nil) { store.tab = t }
+                }
+                Spacer(minLength: 0)
             }
-            Spacer()
         }
         .background(.bar)
+    }
+
+    /// A .bdf tab: "HA.bdf", an asterisk while it has unsaved changes, and a close button.
+    private func sheetTab(_ id: UUID, _ s: Project) -> some View {
+        tab(selected: store.tab == .bdf && store.activeSheetID == id, icon: DocTab.bdf.icon, title: "\(s.entityName).bdf",
+            dirty: store.dirty && store.dirtySheets.contains(id),
+            close: store.openSheetIDs.count > 1 ? { store.closeSheet(id) } : nil) { store.openSheet(id) }
+    }
+
+    private func tab(selected: Bool, icon: String, title: String, dirty: Bool, close: (() -> Void)?,
+                     open: @escaping () -> Void) -> some View {
+        HStack(spacing: 0) {
+            Button(action: open) {
+                HStack(spacing: 6) {
+                    Image(systemName: icon).font(.caption)
+                    Text(title).font(.callout)
+                    if dirty { Text("*").foregroundStyle(.secondary) }
+                }
+                .padding(.leading, 14)
+                .padding(.trailing, close == nil ? 14 : 4)
+                .frame(height: 30)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if let close {
+                Button(action: close) {
+                    Image(systemName: "xmark").font(.system(size: 8, weight: .semibold))
+                        .frame(width: 16, height: 16)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Close \(title)")
+                .padding(.trailing, 8)
+            }
+        }
+        .background(selected ? Color(nsColor: .controlBackgroundColor) : .clear)
+        .overlay(alignment: .top) { if selected { Rectangle().fill(Theme.accent).frame(height: 2) } }
+        .foregroundStyle(selected ? .primary : .secondary)
+        .overlay(alignment: .trailing) { Divider().frame(height: 30) }
     }
 }
 

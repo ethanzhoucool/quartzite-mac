@@ -197,6 +197,7 @@ extension RegressionTests {
         testCompileCancellationAcrossDocuments()
         testMultiSheetStore()
         testLegacyAutosaveRestores()
+        testSheetTabsAndFileCommands()
         return failures == 0
     }
     @MainActor
@@ -350,6 +351,80 @@ extension RegressionTests {
         assertEqual(store.design.sheets.count, 3, "mutateDesign adds a sheet")
         store.undo()
         assertEqual(store.design.sheets.count, 2, "Undo removes it again")
+    }
+
+    /// Document tabs, Hierarchy Up and the File / Edit / Project commands for sheets (plan 6.1-6.2).
+    @MainActor
+    static func testSheetTabsAndFileCommands() {
+        let store = Store(persist: false)
+        store.loadDesign(HierarchySelfTest.haFA(), from: nil, dirty: false)
+        let fa = store.design.sheet(named: "FA")!.id!, ha = store.design.sheet(named: "HA")!.id!
+        assertEqual(store.openSheetIDs, [fa], "A loaded design opens one tab, its top-level file")
+        let blocks = store.project.components.filter { $0.kind == .block }
+        assertTrue(store.openBlock(blocks[1].id), "Double-clicking a block opens its file")
+        assertEqual(store.activeSheetID, ha, "The block's sheet is shown")
+        assertEqual(store.openSheetIDs, [fa, ha], "in a new tab")
+        assertEqual(store.hierarchyTrail.map(\.instance), [blocks[1].id], "and the instance is remembered")
+        assertTrue(store.hierarchyUp(), "Hierarchy Up goes back")
+        assertEqual(store.activeSheetID, fa, "to the parent file")
+        assertEqual(store.selection, [.comp(blocks[1].id)], "with the same instance selected")
+        assertTrue(store.hierarchyTrail.isEmpty, "and the trail is used up")
+        store.openSheet(ha)
+        assertTrue(store.hierarchyTrail.isEmpty, "Opening a file from its tab has no trail")
+        assertTrue(store.hierarchyUp(), "Hierarchy Up without a trail")
+        assertEqual(store.selection, [.comp(blocks[0].id)], "selects the first instance that uses the file")
+        store.closeSheet(ha)
+        assertEqual(store.openSheetIDs, [fa], "Closing a tab")
+        store.closeSheet(fa)
+        assertEqual(store.openSheetIDs, [fa], "The last tab can't be closed")
+
+        store.openSheet(ha)
+        store.mutate { $0.notes = [TextNote(text: "half", x: 40, y: 400)] }
+        assertEqual(store.dirtySheets, [ha], "Only the edited file gets an asterisk")
+        assertThrows(try store.newSheet(named: "ha"), "File > New refuses a name in use (any case)")
+        assertThrows(try store.newSheet(named: "7447"), "File > New refuses an invalid name")
+        assertNoThrow(try store.newSheet(named: "Spare"), "File > New > Block Diagram/Schematic File")
+        let spare = store.design.sheet(named: "Spare")?.id
+        assertEqual(store.activeSheetID, spare, "opens the new file")
+        assertEqual(store.openSheetIDs.count, 3, "in its own tab")
+        store.mutate {
+            $0.components.append(Component(kind: .input, name: "a", x: 32, y: 64))
+            $0.components.append(Component(kind: .output, name: "y", x: 400, y: 64))
+        }
+        let report = store.createSymbolFiles()
+        assertEqual(report.summary, "Created Spare.bsf; updated 0 instances", "Create Symbol Files for Current File")
+        assertEqual(EditorState.shared.status, report.summary, "reports in the status bar")
+        assertEqual(store.design.sheet(named: "Spare")?.symbol?.ports.map(\.name), ["a", "y"], "and makes the symbol")
+        store.setTopLevel("Spare")
+        assertEqual(store.design.topLevelEntity, "Spare", "Set as Top-Level Entity")
+        assertEqual(store.topProject.entityName, "Spare", "changes the design's pins")
+        store.undo()
+        assertEqual(store.design.topLevelEntity, "FA", "and can be undone")
+        assertThrows(try store.removeSheet(ha), "A file used as a block can't be removed")
+        assertThrows(try store.removeSheet(fa), "The top-level file can't be removed")
+        assertNoThrow(try store.removeSheet(spare!), "Remove File from Project")
+        assertFalse(store.openSheetIDs.contains(spare!), "closes its tab")
+        assertNoThrow(try store.renameSheet(ha, to: "HALF"), "Rename...")
+        assertTrue(store.design.sheet(named: "FA")!.components.filter { $0.kind == .block }.allSatisfy { $0.symbol?.name == "HALF" },
+                   "renames its block instances")
+
+        // Edit > Update Symbol or Block: give HALF a new pin and a new symbol without updating FA.
+        store.openSheet(ha)
+        store.mutate { $0.components.append(Component(kind: .input, name: "en", x: 32, y: 400)) }
+        store.mutateDesign { d in
+            let i = d.sheetIndex(id: ha)!
+            d.sheets[i].symbol = SymbolGenerator.symbol(for: d.sheets[i])
+        }
+        assertEqual(store.design.staleInstances().count, 2, "Both FA blocks are out of date")
+        store.openSheet(fa)
+        store.selection = [.comp(blocks[0].id)]
+        let one = store.updateSymbols(.selected)
+        assertEqual(store.design.staleInstances().map(\.component.id), [blocks[1].id], "Updating the selected block updates only it (\(one))")
+        store.selection = []
+        store.updateSymbols(.all)
+        assertTrue(store.design.staleInstances().isEmpty, "Updating all blocks in the file updates the other one")
+        assertTrue(store.project.components.filter { $0.kind == .block }.allSatisfy { $0.portIndex(named: "en") != nil },
+                   "and both have the new port")
     }
 
     @MainActor
