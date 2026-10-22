@@ -124,6 +124,8 @@ final class Store {
     /// Blocks the user descended into (Hierarchy Up returns along it).
     var hierarchyTrail: [(sheet: UUID, instance: UUID)] = []
     var fileURL: URL?
+    /// The Quartus file an unsaved design was imported from (cleared on save or load).
+    var importedFrom: String?
     var dirty = false
     /// Sheets changed since the last save (their tabs show an asterisk).
     var dirtySheets: Set<UUID> = []
@@ -961,6 +963,7 @@ final class Store {
         openSheetIDs = [activeSheetID]
         hierarchyTrail = []
         fileURL = url
+        importedFrom = nil
         self.dirty = dirty
         dirtySheets = dirty ? Set(d.sheets.compactMap(\.id)) : []
         suppressChange = false
@@ -998,8 +1001,9 @@ final class Store {
     func open() {
         guard confirmDiscard() else { return }
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [Store.projectType, .json]
+        panel.allowedContentTypes = [Store.projectType, .json] + QuartusImport.extensions.sorted().compactMap { UTType(filenameExtension: $0) }
         panel.allowsOtherFileTypes = true
+        panel.message = "Choose a Quartzite project, or a Quartus project (.qpf, .qsf) or block diagram (.bdf) to import"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         load(url)
     }
@@ -1012,6 +1016,7 @@ final class Store {
     }
 
     private func load(_ url: URL) {
+        if QuartusImport.canImport(url) { importQuartus(url); return }
         do {
             let data = try Data(contentsOf: url)
             loadDesign(try DesignProject.load(data), from: url, dirty: false)
@@ -1019,6 +1024,20 @@ final class Store {
             autosave()
         } catch {
             alert("Could not open project", error.localizedDescription)
+        }
+    }
+
+    /// File > Open on a .qpf, .qsf or .bdf: the design opens unsaved, and Save asks for a .qzproj.
+    func importQuartus(_ url: URL) {
+        do {
+            let r = try QuartusImport.importProject(at: url)
+            loadDesign(r.design, from: nil, dirty: true)
+            importedFrom = url.lastPathComponent
+            systemMessages.append(Message(level: .info, text: "Imported from \(url.lastPathComponent): \(r.design.sheets.count) block diagram\(r.design.sheets.count == 1 ? "" : "s"), top-level entity \(r.design.topLevelEntity)",
+                                          children: r.notes.map { Message(level: .warning, text: $0) }))
+            autosave()
+        } catch {
+            alert("Could not import \(url.lastPathComponent)", error.localizedDescription)
         }
     }
 
@@ -1038,6 +1057,7 @@ final class Store {
     func saveProject(to url: URL) throws {
         try design.encoded().write(to: url, options: .atomic)
         fileURL = url
+        importedFrom = nil
         dirty = false
         dirtySheets = []
         autosave()

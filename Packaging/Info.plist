@@ -25,12 +25,43 @@
 			<dict><key>public.filename-extension</key><array><string>qzproj</string></array></dict>
 		</dict>
 	</array>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key><string>com.quartzite.imported.quartus-project</string>
+			<key>UTTypeDescription</key><string>Quartus Prime Project</string>
+			<key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key><array><string>qpf</string></array></dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key><string>com.quartzite.imported.quartus-bdf</string>
+			<key>UTTypeDescription</key><string>Quartus Block Diagram/Schematic File</string>
+			<key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key><array><string>bdf</string></array></dict>
+		</dict>
+	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key><string>Quartzite Project</string>
 			<key>CFBundleTypeRole</key><string>Editor</string>
 			<key>LSItemContentTypes</key><array><string>com.quartzite.project</string></array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key><string>Quartus Prime Project</string>
+			<key>CFBundleTypeRole</key><string>Viewer</string>
+			<key>LSHandlerRank</key><string>Alternate</string>
+			<key>LSItemContentTypes</key><array><string>com.quartzite.imported.quartus-project</string></array>
+			<key>CFBundleTypeExtensions</key><array><string>qpf</string></array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key><string>Quartus Block Diagram/Schematic File</string>
+			<key>CFBundleTypeRole</key><string>Viewer</string>
+			<key>LSHandlerRank</key><string>Alternate</string>
+			<key>LSItemContentTypes</key><array><string>com.quartzite.imported.quartus-bdf</string></array>
+			<key>CFBundleTypeExtensions</key><array><string>bdf</string></array>
 		</dict>
 	</array>
 </dict>

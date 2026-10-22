@@ -31,6 +31,7 @@ struct QuartziteApp: App {
             let dir = (url.deletingLastPathComponent().path as NSString).abbreviatingWithTildeInPath
             return "Quartzite - \(dir)/\(store.title) - \(store.topProject.entityName)"
         }
+        if let source = store.importedFrom { return "Quartzite - Imported from \(source) - \(store.topProject.entityName)" }
         return "Quartzite - \(store.topProject.entityName)"
     }
 }
@@ -48,7 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
     }
-    /// Finder double-click, drag onto the Dock icon, or `open -a Quartzite file.qzproj`.
+    /// Finder double-click, drag onto the Dock icon, or `open -a Quartzite file.qzproj`. Quartus
+    /// .qpf / .qsf / .bdf files are imported (see `Store.open(_:)`).
     /// The window holds one project, so only the last file is opened.
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.last else { return }
