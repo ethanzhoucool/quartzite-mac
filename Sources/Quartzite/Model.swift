@@ -303,7 +303,7 @@ struct BoardPin: Identifiable, Hashable {
         ]
         let segments = ["a", "b", "c", "d", "e", "f", "g"]
         var all: [BoardPin] = []
-        all += sw.enumerated().map { BoardPin(label: "SW\($0.offset)", pin: $0.element, isInput: true, kind: .slideSwitch, ioStandard: "2.5 V") }
+        all += sw.enumerated().map { BoardPin(label: "SW\($0.offset)", pin: $0.element, isInput: true, kind: .slideSwitch, ioStandard: "3.3-V LVTTL") }
         all += key.enumerated().map { BoardPin(label: "KEY\($0.offset)", pin: $0.element, isInput: true, kind: .pushButton, activeLow: true, ioStandard: "3.3-V LVTTL") }
         all += led.enumerated().map { BoardPin(label: "LEDR\($0.offset)", pin: $0.element, isInput: false, kind: .led, ioStandard: "3.3-V LVTTL") }
         for (d, pins) in hex.enumerated() {
