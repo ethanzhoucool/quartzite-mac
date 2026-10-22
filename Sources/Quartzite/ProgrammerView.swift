@@ -268,31 +268,34 @@ final class ProgrammerModel {
         let c = ProcessCancel()
         cancel = c
         let svc = ProgrammerService(options: o, cancel: c)
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        // A let box, not [weak self]: Swift 5.10 rejects a captured weak var in the nested
+        // main-queue closures below.
+        let ref = WeakModel(self)
+        DispatchQueue.global(qos: .userInitiated).async {
             var index: Int?
             do {
                 index = try ProgrammerService.fpga(in: known ?? svc.detect()).index
             } catch {
                 let e = error
-                DispatchQueue.main.async { MainActor.assumeIsolated { self?.boardStopped(generation, e) } }
+                DispatchQueue.main.async { MainActor.assumeIsolated { ref.value?.boardStopped(generation, e) } }
                 return
             }
             while true {
-                let keepGoing = DispatchQueue.main.sync { MainActor.assumeIsolated { self?.boardGeneration == generation && self?.boardRunning == true } }
+                let keepGoing = DispatchQueue.main.sync { MainActor.assumeIsolated { ref.value?.boardGeneration == generation && ref.value?.boardRunning == true } }
                 guard keepGoing, let i = index else { return }
                 do {
                     let s = try svc.sampleBoard(map: map, index: i, workDirectory: ProgrammerService.workDirectory)
                     DispatchQueue.main.async {
                         MainActor.assumeIsolated {
-                            guard let self, self.boardGeneration == generation else { return }
-                            self.board = s
-                            self.boardUpdated = Date()
-                            self.boardMessage = "Live (boundary-scan SAMPLE; the design keeps running)"
+                            guard let model = ref.value, model.boardGeneration == generation else { return }
+                            model.board = s
+                            model.boardUpdated = Date()
+                            model.boardMessage = "Live (boundary-scan SAMPLE; the design keeps running)"
                         }
                     }
                 } catch {
                     let e = error
-                    DispatchQueue.main.async { MainActor.assumeIsolated { self?.boardStopped(generation, e) } }
+                    DispatchQueue.main.async { MainActor.assumeIsolated { ref.value?.boardStopped(generation, e) } }
                     index = nil
                     return
                 }
@@ -314,6 +317,12 @@ final class ProgrammerModel {
         boardRunning = false
         boardMessage = "Stopped"
     }
+}
+
+/// Weak reference that a background loop can capture as a constant.
+private final class WeakModel: @unchecked Sendable {
+    weak var value: ProgrammerModel?
+    init(_ value: ProgrammerModel) { self.value = value }
 }
 
 // MARK: - Programmer window
@@ -628,6 +637,7 @@ private struct SlideSwitch: View {
 // MARK: - Settings
 
 /// Settings > Programmer: openFPGALoader, the USB-Blaster II firmware and the BSDL file.
+@MainActor
 struct ProgrammerSettingsView: View {
     @Bindable var model: ProgrammerModel
 
