@@ -8,8 +8,26 @@ For each folder (written by `Quartzite --export-suite`):
      simulated exhaustively with Icarus Verilog against expected.json
   4. quartus_eda --gen_testbench from Waveform.vwf: proves Quartus parses the
      vectors; the generated testbench is run and sampled mid-step
+Steps 3 and 4 are skipped, with the reason, for designs with several .bdf files or a
+library macro (see skip_reason).
 """
 import json, os, pathlib, re, subprocess, sys
+
+CONVERSION = "Quartus' reading of the .bdf matches Quartzite"
+WAVEFORM = 'Waveform.vwf counts through every input and gives the expected outputs'
+
+def skip_reason(exp):
+    """Why steps 3 and 4 can't check this design, or None. --convert_bdf_to_verilog
+    translates the top .bdf alone, so blocks from other .bdf files and the 7447 (a
+    maxplus2 macro that altera_primitives.v doesn't define) are left undefined.
+    Check their compiled .vo with vo_check.py instead."""
+    files, macros = exp.get('files', []), exp.get('macros', [])
+    parts = ([f'{len(files)} .bdf files'] if len(files) > 1 else []) + \
+            [f'the {m} library macro' for m in macros]
+    if not parts:
+        return None
+    return ('skipped: the design has ' + ' and '.join(parts) +
+            ", and the converted top .bdf can't be simulated on its own")
 
 def run(cmd, cwd, log):
     p = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
@@ -41,6 +59,13 @@ def check(folder):
     else:
         result('pin locations in fitter report', False, 'no .pin file')
 
+    reason = skip_reason(exp)
+    if reason:
+        result(CONVERSION, None, reason)
+        result(WAVEFORM, None, reason)
+        log.close()
+        return results
+
     # Quartus' own Verilog translation of the schematic
     conv = d / f'{e}.v'
     conv.unlink(missing_ok=True)
@@ -70,12 +95,12 @@ endmodule
             p = run(['vvp', 'qz_tb.out'], d, log)
             got = {int(m.group(1)): m.group(2) for m in re.finditer(r'ROW (\d+) ([01xz]+)', p.stdout)}
             bad = [i for i, r in enumerate(rows) if got.get(i) != r]
-            result("Quartus' reading of the .bdf matches Quartzite", p.returncode == 0 and not bad,
+            result(CONVERSION, p.returncode == 0 and not bad,
                    f'{len(rows)} rows' if not bad else f'rows {bad[:8]}: quartus {[got.get(i) for i in bad[:8]]} vs {[rows[i] for i in bad[:8]]}')
         else:
-            result("Quartus' reading of the .bdf matches Quartzite", False, 'iverilog failed: ' + p.stderr[-800:])
+            result(CONVERSION, False, 'iverilog failed: ' + p.stderr[-800:])
     else:
-        result("Quartus' reading of the .bdf matches Quartzite", False, 'convert_bdf_to_verilog produced nothing')
+        result(CONVERSION, False, 'convert_bdf_to_verilog produced nothing')
 
     # Waveform vectors through Quartus' testbench generator
     vt = d / 'qz_wave.vt'
@@ -107,12 +132,12 @@ endmodule
             n = len(ins)
             want = {i: format(i, f'0{n}b') + rows[i] for i in range(1 << n)}
             bad = [i for i in want if got.get(i) != want[i]]
-            result('Waveform.vwf counts through every input and gives the expected outputs', p.returncode == 0 and not bad,
+            result(WAVEFORM, p.returncode == 0 and not bad,
                    f'{len(want)} steps' if not bad else f'steps {bad[:6]}: {[got.get(i) for i in bad[:6]]} vs {[want[i] for i in bad[:6]]}')
         else:
-            result('Waveform.vwf counts through every input and gives the expected outputs', False, p.stderr[-800:])
+            result(WAVEFORM, False, p.stderr[-800:])
     else:
-        result('Waveform.vwf counts through every input and gives the expected outputs', False,
+        result(WAVEFORM, False,
                'quartus_eda produced no testbench' if not vt.exists() else 'no converted Verilog')
 
     log.close()
@@ -125,8 +150,9 @@ if __name__ == '__main__':
         res = check(f)
         summary.append(f'## {pathlib.Path(f).name}')
         for name, ok, detail in res:
-            all_ok &= ok
-            line = f"- {'PASS' if ok else 'FAIL'} {name}" + (f": {detail}" if detail else '')
+            if ok is not None:
+                all_ok &= ok
+            line = f"- {'SKIP' if ok is None else 'PASS' if ok else 'FAIL'} {name}" + (f": {detail}" if detail else '')
             print(f"{pathlib.Path(f).name}: {line}")
             summary.append(line)
         summary.append('')
