@@ -7,14 +7,14 @@ import AppKit
 /// recording permission.
 enum WindowSnapshot {
     @MainActor
-    static func run(_ p: Project, to dir: URL) -> Bool {
+    static func run(_ d: DesignProject, to dir: URL) -> Bool {
         do { try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
         catch { print("Could not create snapshot directory: \(error.localizedDescription)"); return false }
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.accessory)
         let store = Store(persist: false)
-        store.project = p
-        let state = CompileFlow.run(p)
+        store.loadDesign(d, from: nil, dirty: true)
+        let state = CompileFlow.run(d)
         store.flow = state
         store.messages = state.messages
         store.compiled = state.circuit
@@ -27,7 +27,7 @@ enum WindowSnapshot {
         var ok = true
         // Live run through the asynchronous pipeline: capture the window while a stage runs.
         let live = Store(persist: false)
-        live.project = p
+        live.loadDesign(d, from: nil, dirty: true)
         live.startCompilation()
         var sawRunning = false
         let deadline = Date().addingTimeInterval(20)
@@ -74,16 +74,16 @@ enum WindowSnapshot {
     /// `--snapshot-window <file> <dir> --hardware`: a compilation through the open-source
     /// Fitter and Assembler (needs the toolchain), captured while nextpnr runs and afterwards.
     @MainActor
-    static func runHardware(_ p: Project, to dir: URL) -> Bool {
+    static func runHardware(_ d: DesignProject, to dir: URL) -> Bool {
         do { try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
         catch { print("Could not create snapshot directory: \(error.localizedDescription)"); return false }
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.accessory)
         let store = Store(persist: false)
-        store.project = p
+        store.loadDesign(d, from: nil, dirty: true)
         store.toolchainSearch = Toolchain.locate()
         guard store.toolchainSearch.toolchain != nil else { print(store.toolchainSearch.summary); return false }
-        store.fileURL = dir.appendingPathComponent("project/\(p.entityName).qzproj")
+        store.fileURL = dir.appendingPathComponent("project/\(d.projectName).qzproj")
         store.useHardwareFlow = true
         store.startCompilation()
         var ok = true, sawFitter = false

@@ -19,7 +19,7 @@ enum CLI {
 
     /// `--compile <file> --sof <out.sof>`: the full flow with real place and route and the
     /// experimental Assembler, printing each message as it is produced.
-    static func compileToSOF(_ p: Project, sof: URL, args: [String], value: (String) -> String?) -> Int32 {
+    static func compileToSOF(_ p: DesignProject, sof: URL, args: [String], value: (String) -> String?) -> Int32 {
         let search = Toolchain.locate()
         print("Info: \(search.summary)")
         var hw: HardwareConfig? = nil
@@ -42,7 +42,7 @@ enum CLI {
             m.reportLines().forEach { print($0) }
         }
         hw?.onMessage = { show($0) }
-        var state = FlowState(project: p, mainTask: "Compilation", hardware: hw)
+        var state = FlowState(design: p, mainTask: "Compilation", hardware: hw)
         state.toolchainNote = hw == nil ? "Install the open-source toolchain (docs/TOOLCHAIN_NOTES.md) to generate the experimental .sof." : nil
         for stage in FlowStage.fullCompilation {
             let t = Date()
@@ -89,11 +89,9 @@ enum CLI {
     }
 
     /// Returns the process exit code.
-    /// The top-level sheet of a .qzproj (format 1 or 2), as the app saves it.
-    static func loadTop(_ file: String) throws -> Project {
-        let d = try DesignProject.load(Data(contentsOf: URL(fileURLWithPath: file)))
-        guard let top = d.top else { throw DesignProject.LoadError(message: "\(file): no top-level sheet") }
-        return top
+    /// A .qzproj of either format, as the app saves it.
+    static func loadDesign(_ file: String) throws -> DesignProject {
+        try DesignProject.load(Data(contentsOf: URL(fileURLWithPath: file)))
     }
 
     static func run(_ args: [String]) -> Int32 {
@@ -108,28 +106,29 @@ enum CLI {
                 return 0
             }
             if let file = value(after: "--export-project"), let i = args.firstIndex(of: "--export-project"), i + 2 < args.count {
-                let p = try loadTop(file)
+                let d = try loadDesign(file)
                 let folder = args[i + 2]
-                try TestDesigns.exportSuite(to: URL(fileURLWithPath: folder, isDirectory: true), designs: [(p.entityName, p)])
+                try TestDesigns.exportSuite(to: URL(fileURLWithPath: folder, isDirectory: true), designs: [(d.projectName, d)])
                 return 0
             }
             #if canImport(SwiftUI)
             if let file = value(after: "--render-project"), let i = args.firstIndex(of: "--render-project"), i + 2 < args.count {
-                let p = try loadTop(file)
+                let d = try loadDesign(file)
+                guard let p = d.top else { throw DesignProject.LoadError(message: "\(file): no top-level sheet") }
                 let dir = URL(fileURLWithPath: args[i + 2], isDirectory: true)
                 return MainActor.assumeIsolated { SelfTest.renderProject(p, to: dir) } ? 0 : 1
             }
             if let file = value(after: "--snapshot-window"), let i = args.firstIndex(of: "--snapshot-window"), i + 2 < args.count {
-                let p = try loadTop(file)
+                let d = try loadDesign(file)
                 let dir = URL(fileURLWithPath: args[i + 2], isDirectory: true)
-                if args.contains("--hardware") { return MainActor.assumeIsolated { WindowSnapshot.runHardware(p, to: dir) } ? 0 : 1 }
-                return MainActor.assumeIsolated { WindowSnapshot.run(p, to: dir) } ? 0 : 1
+                if args.contains("--hardware") { return MainActor.assumeIsolated { WindowSnapshot.runHardware(d, to: dir) } ? 0 : 1 }
+                return MainActor.assumeIsolated { WindowSnapshot.run(d, to: dir) } ? 0 : 1
             }
             #endif
             if let file = value(after: "--compile") {
                 // Quartzite --compile <file.qzproj> [--report] [--sof <out.sof> [--layout 14|16|17] [--work <dir>] [--seed n]]
                 _ = try layoutOption(args)
-                let p = try loadTop(file)
+                let p = try loadDesign(file)
                 guard let sofPath = value(after: "--sof") else {
                     let state = CompileFlow.run(p)
                     for m in state.messages { m.reportLines().forEach { print($0) } }

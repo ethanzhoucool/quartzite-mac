@@ -8,31 +8,55 @@ enum QuartusExport {
     }
 
     static func makeBundle(_ project: Project, conn: Connectivity, date: Date = Date()) throws -> Bundle {
-        try SimulationResult.validateInputCount(project.inputPins.count)
-        let errors = Compiler.compile(project).1.filter { $0.level == .error }
-        guard errors.isEmpty else {
+        try makeBundle(DesignProject(single: project), date: date)
+    }
+
+    /// The Quartus project folder: .qpf/.qsf named after the design, one .bdf per sheet used
+    /// under the top (and its .bsf if it has a symbol), the flattened Verilog backup and the
+    /// top's pin assignments and waveform.
+    static func makeBundle(_ d: DesignProject, date: Date = Date()) throws -> Bundle {
+        guard let top = d.top else {
+            throw NSError(domain: "Quartzite", code: 3, userInfo: [NSLocalizedDescriptionKey: "The top-level entity \(d.topLevelEntity) is not a file in the project"])
+        }
+        try SimulationResult.validateInputCount(top.inputPins.count)
+        let (_, msgs, flat) = Compiler.compile(d)
+        let errors = msgs.filter { $0.level == .error }
+        guard errors.isEmpty, let flat else {
             throw NSError(domain: "Quartzite", code: 3, userInfo: [NSLocalizedDescriptionKey: errors.map(\.text).joined(separator: "; ")])
         }
-        let routing = Routing(project: project, conn: conn)
-        // A forced stub through another net changes the function in Quartus.
-        // Refuse the export instead of emitting a short circuit with a warning.
-        guard routing.warnings.isEmpty else {
-            throw NSError(domain: "Quartzite", code: 4, userInfo: [NSLocalizedDescriptionKey:
-                routing.warnings.joined(separator: "; ") + ". Move the symbols apart before exporting."])
+        let used = d.usedSheets()
+        let multi = used.count > 1
+        var sheetFiles: [(name: String, contents: String)] = [], symbolFiles: [(name: String, contents: String)] = []
+        var notes: [String] = []
+        for e in used {
+            guard let s = d.sheet(named: e) else { continue }
+            let routing = Routing(project: s, conn: Connectivity(s))
+            // A forced stub through another net changes the function in Quartus.
+            // Refuse the export instead of emitting a short circuit with a warning.
+            guard routing.warnings.isEmpty else {
+                throw NSError(domain: "Quartzite", code: 4, userInfo: [NSLocalizedDescriptionKey:
+                    routing.warnings.map { multi ? "\(e).bdf: \($0)" : $0 }.joined(separator: "; ") + ". Move the symbols apart before exporting."])
+            }
+            if !routing.labeledWires.isEmpty {
+                notes.append((multi ? "\(e).bdf: " : "") + "\(routing.labeledWires.count) wire(s) are written as matching net labels instead of drawn lines (they could not be drawn without touching another wire). Quartus treats them as connected.")
+            }
+            sheetFiles.append(("\(s.entityName).bdf", bdf(s, routing: routing)))
+            if let sym = s.symbol { symbolFiles.append(("\(s.entityName).bsf", bsf(sym))) }
         }
-        let e = project.entityName
-        var notes = routing.warnings
-        if !routing.labeledWires.isEmpty {
-            notes.append("\(routing.labeledWires.count) wire(s) are written as matching net labels instead of drawn lines (they could not be drawn without touching another wire). Quartus treats them as connected.")
+        let unused = d.sheets.map(\.entityName).filter { e in !used.contains { $0.caseInsensitiveCompare(e) == .orderedSame } }
+        if !unused.isEmpty {
+            notes.append("Not exported (not used under \(top.entityName)): \(unused.map { "\($0).bdf" }.joined(separator: ", "))")
         }
+        let name = d.projectName
+        let flatConn = Connectivity(flat.project)
         return Bundle(files: [
-            ("\(e).qpf", qpf(project, date: date)),
-            ("\(e).qsf", qsf(project, date: date)),
-            ("\(e).bdf", bdf(project, routing: routing)),
-            ("Waveform.vwf", try vwf(project)),
-            ("\(e)_pins.qsf", pinAssignments(project)),
-            ("\(e)_backup.v", verilog(project, conn: conn)),
-            ("README_LAB.txt", readme(project)),
+            ("\(name).qpf", qpf(name: name, date: date)),
+            ("\(name).qsf", qsf(d, top: top, date: date)),
+        ] + sheetFiles + symbolFiles + [
+            ("Waveform.vwf", try vwf(top)),
+            ("\(name)_pins.qsf", pinAssignments(top)),
+            ("\(name)_backup.v", verilog(flat.project, conn: flatConn, hierarchy: flat.identity ? nil : flat)),
+            ("README_LAB.txt", multi ? readme(d, flat: flat) : readme(top)),
         ], notes: notes)
     }
 
@@ -45,7 +69,9 @@ enum QuartusExport {
         return f.string(from: d)
     }
 
-    static func qpf(_ p: Project, date: Date) -> String {
+    static func qpf(_ p: Project, date: Date) -> String { qpf(name: p.entityName, date: date) }
+
+    static func qpf(name: String, date: Date) -> String {
         """
         # Quartus Prime project file written by Quartzite for Mac.
         # Open this file with File > Open Project in Quartus Prime 18.0 or newer.
@@ -55,7 +81,7 @@ enum QuartusExport {
 
         # Revisions
 
-        PROJECT_REVISION = "\(p.entityName)"
+        PROJECT_REVISION = "\(name)"
 
         """
     }
@@ -382,14 +408,22 @@ enum QuartusExport {
 
     // MARK: - Verilog backup
 
-    static func verilog(_ p: Project, conn: Connectivity) -> String {
+    static func verilog(_ p: Project, conn: Connectivity, hierarchy flat: FlatDesign? = nil) -> String {
         let e = p.entityName
         let ins = p.inputPins, outs = p.outputPins
         var portList = ins.map { "\tinput  wire \($0.name)" } + outs.map { "\toutput wire \($0.name)" }
         if portList.isEmpty { portList = ["\t/* no pins */"] }
         var s = "// Structural Verilog equivalent of \(e).bdf, written by Quartzite for Mac.\n"
         s += "// Backup only: the project uses \(e).bdf. If the schematic ever fails to open,\n"
-        s += "// add this file to the project instead and make it the top-level entity.\n\n"
+        s += "// add this file to the project instead and make it the top-level entity.\n"
+        if let flat {
+            s += "//\n// The hierarchy is flattened into this one module. Gates are named after their\n"
+            s += "// instance path (inst2_inst1 is inst1 inside block inst2). Hierarchy:\n"
+            flat.hierarchy.walk { n, path in
+                s += "//   " + String(repeating: "  ", count: path.count) + (path.isEmpty ? n.entity : n.label) + (n.isMacro ? " (library macro)" : "") + "\n"
+            }
+        }
+        s += "\n"
         s += "module \(e) (\n" + portList.joined(separator: ",\n") + "\n);\n"
         var names: [Int: String] = [:]
         var used = Set(p.components.map { $0.name.lowercased() })
@@ -445,6 +479,62 @@ enum QuartusExport {
     }
 
     // MARK: - README
+
+    /// README for a design with several .bdf files: open the .qpf, or rebuild the project by hand.
+    static func readme(_ d: DesignProject, flat: FlatDesign) -> String {
+        guard let top = d.top else { return "" }
+        let name = d.projectName, e = top.entityName
+        let pins = (top.inputPins + top.outputPins).map { pin -> String in
+            let loc = pin.location ?? "(not assigned)"
+            let board = BoardPin.lookup(pin.location)?.label ?? ""
+            return "  \(pin.name.padding(toLength: 8, withPad: " ", startingAt: 0)) \(loc.padding(toLength: 10, withPad: " ", startingAt: 0)) \(board)"
+        }.joined(separator: "\n")
+        var files = flat.sheetsUsed.map { s -> String in
+            let f = "\(s).bdf".padding(toLength: 16, withPad: " ", startingAt: 0)
+            return "  \(f)" + (s == e ? "Top-level block diagram" : "Block diagram used as a block") + "\n"
+        }.joined()
+        for s in flat.sheetsUsed where d.sheet(named: s)?.symbol != nil {
+            files += "  \("\(s).bsf".padding(toLength: 16, withPad: " ", startingAt: 0))Symbol for \(s).bdf\n"
+        }
+        let macros = flat.macrosUsed.isEmpty ? "" : "\nLibrary macros (from Quartus' own library, not copied here)\n"
+            + flat.macrosUsed.map { "  \($0) (\((MacroLibrary.named($0)?.library ?? []).joined(separator: " > ")))\n" }.joined()
+        return """
+        \(name) - Quartus project exported from Quartzite for Mac
+        ==========================================================
+
+        Files
+          \(name).qpf\(String(repeating: " ", count: max(1, 14 - name.count)))Quartus project (open this)
+          \(name).qsf\(String(repeating: " ", count: max(1, 14 - name.count)))Settings: device \(d.device), top-level entity \(e), pin assignments
+        \(files)  Waveform.vwf    Simulation test vectors (all input combinations)
+          \(name)_pins.qsf   Pin assignments only, for Assignments > Import Assignments
+          \(name)_backup.v   Same circuit, flattened, as structural Verilog (fallback only)
+        \(macros)
+        Pin assignments
+        \(pins)
+
+        In the lab (Quartus 18.0)
+          Route A: open the exported project
+            1. Copy this whole folder to the lab computer (OneDrive / USB).
+            2. File > Open Project... > \(name).qpf
+            3. Processing > Start Compilation (Ctrl+L). Expect 0 errors.
+
+          Route B: build the project yourself (if Route A complains)
+            1. File > New Project Wizard. Choose a NEW, empty folder, name the project
+               \(name), top-level entity \(e), device \(d.device).
+            2. Copy every .bdf and .bsf file from this folder into the new folder.
+            3. Project > Add/Remove Files in Project: add every .bdf file.
+            4. Assignments > Import Assignments... > \(name)_pins.qsf
+            5. In the Project Navigator (Files tab), right-click \(e).bdf and choose
+               Set as Top-Level Entity.
+            6. Processing > Start Compilation (Ctrl+L). Expect 0 errors.
+
+          Then
+            File > Open > Waveform.vwf, then Simulation > Run Functional Simulation.
+            Tools > Programmer: DE-SoC [USB-1], add SOCVHPS before the FPGA if needed,
+            add output_files/\(name).sof, tick Program/Configure, Start.
+
+        """
+    }
 
     static func readme(_ p: Project) -> String {
         let e = p.entityName

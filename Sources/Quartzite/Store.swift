@@ -504,7 +504,7 @@ final class Store {
     /// Output values for the board preview's current switch positions.
     func boardOutputs() -> [UUID: Bool]? {
         // Pure read: never mutates state, so it is safe to call while views render.
-        guard let c = (compileIsStale ? nil : compiled) ?? Compiler.compile(topProject).0 else { return nil }
+        guard let c = (compileIsStale ? nil : compiled) ?? Compiler.compile(design).0 else { return nil }
         // Push buttons are active low: they read 0 while pressed.
         let bits = c.inputs.map { pin -> Bool in
             let v = boardInputs[pin.id] ?? false
@@ -608,7 +608,7 @@ final class Store {
 
     func exportQuartusProject() {
         let project = topProject
-        guard Compiler.compile(project, checkLocations: false).0 != nil else {
+        guard Compiler.compile(design, checkLocations: false).0 != nil else {
             compile()
             tab = .bdf
             alert("Fix the errors first", "The design check found errors (see Messages). Quartus would refuse to compile it, so nothing was exported.")
@@ -628,20 +628,19 @@ final class Store {
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.prompt = "Export Here"
-        panel.message = "Choose where to create the \(project.entityName)_quartus folder"
+        panel.message = "Choose where to create the \(design.projectName)_quartus folder"
         guard panel.runModal() == .OK, let parent = panel.url else { return }
-        exportBundle(into: parent.appendingPathComponent("\(project.entityName)_quartus", isDirectory: true), reveal: true)
+        exportBundle(into: parent.appendingPathComponent("\(design.projectName)_quartus", isDirectory: true), reveal: true)
     }
 
     /// Writes the Quartus project folder. Used by the menu command and by tests.
     @discardableResult
     func exportBundle(into folder: URL, reveal: Bool) -> Bool {
         do {
-            let project = topProject
-            let bundle = try QuartusExport.makeBundle(project, conn: Connectivity(project))
+            let bundle = try QuartusExport.makeBundle(design)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             var files = bundle.files
-            if let vo = NetlistWriter.bundleFile(project) { files.append(vo) }
+            if let vo = NetlistWriter.bundleFile(design) { files.append(vo) }
             for f in files {
                 let url = folder.appendingPathComponent(f.name)
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

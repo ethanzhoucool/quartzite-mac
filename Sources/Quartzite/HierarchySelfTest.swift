@@ -40,6 +40,7 @@ enum HierarchySelfTest {
         writers(check)
         macros(check)
         flattening(check)
+        flow(check)
     }
 
     /// Truth table rows (outputs as a bit string per row) of a compiled circuit.
@@ -475,6 +476,55 @@ enum HierarchySelfTest {
         mac.output("seg", x: 520, y: 64)
         let macErr = errors(DesignProject(single: mac.p))
         check(macErr.count == 6 && macErr.allSatisfy { $0.contains("VCC") }, "each unconnected 7447 input is an error that says to tie it to VCC (\(macErr.count))")
+    }
+
+    // MARK: - Compile flow, report and bundle (plan 3.4-3.6)
+
+    static func flow(_ check: Check) {
+        print("Hierarchical compile flow and export")
+        let d = TestDesigns.addSub4Design()
+        let state = CompileFlow.run(d)
+        check(!state.failed && state.flat?.identity == false && state.project.isFlatNetlist, "AddSub4 compiles through the full flow (\(state.messages.filter { $0.level == .error }.map(\.text).prefix(2)))")
+        let texts = state.messages.map(\.text)
+        check(["AddSub4", "FA", "HA"].allSatisfy { e in texts.contains("Found 1 design units, including 1 entities, in source file \(e).bdf") },
+              "Analysis & Elaboration reads AddSub4.bdf, FA.bdf and HA.bdf")
+        check(texts.contains("Elaborating entity \"AddSub4\" for the top level hierarchy")
+              && texts.contains("Elaborating entity \"FA\" for hierarchy \"FA:inst1\"")
+              && texts.contains("Elaborating entity \"HA\" for hierarchy \"FA:inst1|HA:inst\""),
+              "each entity is elaborated once, with its first hierarchy path")
+        let report = ReportText.render(CompileFlow.report(state))
+        let rows = report.split(separator: "\n").filter { $0.contains("|AddSub4") && $0.contains("work") }
+        check(rows.count == 1 + 4 + 8, "Resource Utilization by Entity has a row for each of the 13 instances (got \(rows.count))")
+        check(report.contains("|AddSub4|FA:inst1|HA:inst1") && report.contains("   |FA:inst1|") && report.contains("      |HA:inst|"),
+              "entity rows show the indented node and the full hierarchy name")
+        check(report.contains("HA.bdf") && report.contains("FA.bdf"), "Source Files Read lists every .bdf")
+        if let s = state.synthesis {
+            check(s.schematicGates == 24 && s.outputs.allSatisfy { $0.exact }, "synthesis counts the 24 drawn gates and minimizes the 9-input outputs exactly")
+        }
+
+        let bundle = try? QuartusExport.makeBundle(d, date: Date(timeIntervalSince1970: 0))
+        let names = bundle?.files.map(\.name) ?? []
+        check(names == ["AddSub4.qpf", "AddSub4.qsf", "AddSub4.bdf", "FA.bdf", "HA.bdf", "AddSub4.bsf", "FA.bsf", "HA.bsf",
+                        "Waveform.vwf", "AddSub4_pins.qsf", "AddSub4_backup.v", "README_LAB.txt"], "the AddSub4 bundle has every .bdf and .bsf (\(names))")
+        if let b = bundle {
+            func file(_ n: String) -> String { b.files.first { $0.name == n }?.contents ?? "" }
+            check(file("AddSub4.qsf").contains("BDF_FILE FA.bdf\nset_global_assignment -name BDF_FILE HA.bdf"), "the .qsf lists FA.bdf and HA.bdf")
+            check(file("HA.bsf").hasSuffix("\r\n") && file("HA.bsf").contains("(symbol\r\n"), "the .bsf files use CRLF like Quartus")
+            let v = file("AddSub4_backup.v")
+            check(v.contains("module AddSub4 (") && v.contains("//     FA:inst1") && v.contains("//       HA:inst1") && !v.contains("FA inst"),
+                  "the Verilog backup is one flattened module with the hierarchy in a comment")
+            let readme = file("README_LAB.txt")
+            check(readme.contains("Route B") && readme.contains("Set as Top-Level Entity") && readme.contains("HA.bdf"), "the README gives both routes")
+            let fa = file("FA.bdf")
+            check(fa.contains("(text \"HA\" (rect") && fa.contains("(text \"inst1\" (rect"), "FA.bdf places its HA blocks")
+        }
+        var unused = d
+        _ = try? unused.addSheet(named: "Spare")
+        let ub = try? QuartusExport.makeBundle(unused)
+        check(ub?.notes.contains { $0.contains("Spare.bdf") } == true && ub?.files.contains { $0.name == "Spare.bdf" } == false,
+              "an unused sheet is not exported, and the notes say so")
+        let vo = NetlistWriter.bundleFile(d)
+        check(vo?.name == "simulation/quartzite/AddSub4_quartzite.vo", "the EDA netlist of a design is named after the top")
     }
 
     // MARK: - Sheet operations (plan 1.4)

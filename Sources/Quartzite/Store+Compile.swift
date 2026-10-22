@@ -132,7 +132,7 @@ extension Store {
         let version = projectVersion
         let generation = UUID()
         flowGeneration = generation
-        var state = reusing ?? FlowState(project: topProject, mainTask: mainTask)
+        var state = reusing ?? FlowState(design: design, mainTask: mainTask)
         state.mainTask = mainTask
         if stages.contains(.fitter) || stages.contains(.assembler) {
             var (hw, note) = hardwareConfig()
@@ -228,7 +228,7 @@ extension Store {
     @discardableResult
     func compile() -> Bool {
         if isProcessing { resetFlow() }
-        let state = CompileFlow.run(topProject, stages: [.analysisElaboration], mainTask: "Analysis & Elaboration")
+        let state = CompileFlow.run(design, stages: [.analysisElaboration], mainTask: "Analysis & Elaboration")
         messages = state.messages
         flow = state
         stageStatus = [.analysisElaboration: state.runs.first?.status ?? .failed]

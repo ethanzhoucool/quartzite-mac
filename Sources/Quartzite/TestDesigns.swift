@@ -315,36 +315,46 @@ enum TestDesigns {
 
     /// Writes `<dir>/<design>/` Quartus bundles plus `expected.json` (our simulator's truth table).
     static func exportSuite(to dir: URL, designs: [(String, Project)] = all) throws {
-        for (folder, p) in designs {
-            let (circuit, msgs) = Compiler.compile(p)
-            guard let circuit else {
+        try exportSuite(to: dir, designs: designs.map { ($0.0, DesignProject(single: $0.1)) })
+    }
+
+    static func exportSuite(to dir: URL, designs: [(String, DesignProject)]) throws {
+        for (folder, d) in designs {
+            let (circuit, msgs, flat) = Compiler.compile(d)
+            guard let circuit, let flat, let top = d.top else {
                 throw NSError(domain: "Quartzite", code: 1, userInfo: [NSLocalizedDescriptionKey:
                     "\(folder) does not compile: " + msgs.filter { $0.level == .error }.map { $0.text }.joined(separator: "; ")])
             }
-            let sim = try SimulationResult.run(circuit, project: p)
-            let bundle = try QuartusExport.makeBundle(p, conn: circuit.conn)
+            let sim = try SimulationResult.run(circuit, project: flat.project)
+            let bundle = try QuartusExport.makeBundle(d)
             let out = dir.appendingPathComponent(folder, isDirectory: true)
             try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
             var files = bundle.files
-            if let vo = NetlistWriter.bundleFile(p) { files.append(vo) }
+            if let vo = NetlistWriter.bundleFile(d) { files.append(vo) }
             for f in files {
                 let url = out.appendingPathComponent(f.name)
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try f.contents.write(to: url, atomically: true, encoding: .utf8)
             }
             let json: [String: Any] = [
-                "entity": p.entityName,
+                "entity": top.entityName,
                 "inputs": sim.inputNames,
                 "outputs": sim.outputNames,
                 "step_ns": QuartusExport.vwfTiming(sim.inputCount).step,
                 "rows": sim.rows.map { r in r.outputs.map { $0 ? "1" : "0" }.joined() },
-                "locations": Dictionary(uniqueKeysWithValues: (p.inputPins + p.outputPins).compactMap { c in
+                "locations": Dictionary(uniqueKeysWithValues: (top.inputPins + top.outputPins).compactMap { c in
                     c.location.map { (c.name, $0) } }),
                 "labeled_wires": bundle.notes,
             ]
             let data = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
             try data.write(to: out.appendingPathComponent("expected.json"))
-            try JSONEncoder().encode(p).write(to: out.appendingPathComponent("\(p.entityName).qzproj"))
+            if d.sheets.count == 1 {
+                var p = top
+                p.id = nil
+                try JSONEncoder().encode(p).write(to: out.appendingPathComponent("\(p.entityName).qzproj"))
+            } else {
+                try d.encoded().write(to: out.appendingPathComponent("\(d.projectName).qzproj"))
+            }
             print("exported \(folder): \(sim.rows.count) rows, \(bundle.notes.count) notes")
         }
     }

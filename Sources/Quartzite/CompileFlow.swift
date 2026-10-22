@@ -64,7 +64,11 @@ struct StageRun {
 }
 
 struct FlowState {
+    /// The design being compiled.
+    var design: DesignProject
+    /// The top sheet until elaboration, then the flattened design (the same sheet if it has no blocks).
     var project: Project
+    var flat: FlatDesign?
     var mainTask: String
     var started = Date()
     var finished: Date?
@@ -83,10 +87,17 @@ struct FlowState {
     /// "Quartzite Full Compilation was successful" line (full compilations only).
     var summary: Message?
 
-    init(project: Project, mainTask: String, hardware: HardwareConfig? = nil) {
-        self.project = project
+    init(design: DesignProject, mainTask: String, hardware: HardwareConfig? = nil) {
+        self.design = design
+        var top = design.top ?? design.sheets[0]
+        top.device = design.device
+        self.project = top
         self.mainTask = mainTask
         self.hardware = hardware
+    }
+
+    init(project: Project, mainTask: String, hardware: HardwareConfig? = nil) {
+        self.init(design: DesignProject(single: project), mainTask: mainTask, hardware: hardware)
     }
 
     func run(_ s: FlowStage) -> StageRun? { runs.last { $0.stage == s } }
@@ -178,19 +189,24 @@ enum CompileFlow {
         var status: StageStatus = .succeeded
         switch stage {
         case .analysisElaboration:
-            let (c, ms) = elaborate(state.project)
+            let (c, ms, flat) = elaborate(state.design)
             body = ms
             state.circuit = c
+            state.flat = flat
+            if let flat { state.project = flat.project }
             if c == nil { status = .failed }
         case .analysisSynthesis:
-            let (c, ms) = elaborate(state.project)
+            let (c, ms, flat) = elaborate(state.design)
             body = ms
             state.circuit = c
+            state.flat = flat
+            if let flat { state.project = flat.project }
             if let c {
                 do {
                     let s = try Synthesizer.run(c, project: state.project)
                     state.synthesis = s
-                    body += synthesisMessages(s, project: state.project)
+                    let sm = synthesisMessages(s, project: state.project)
+                    body += flat.map { Flattener.remap(sm, $0) } ?? sm
                 } catch {
                     body.append(Message(level: .error, text: "\(error)"))
                     status = .failed
@@ -312,7 +328,12 @@ enum CompileFlow {
     /// Runs stages in order, stopping at the first failure (CLI, tests).
     static func run(_ project: Project, stages: [FlowStage] = FlowStage.fullCompilation, mainTask: String = "Compilation",
                     hardware: HardwareConfig? = nil, toolchainNote: String? = nil) -> FlowState {
-        var state = FlowState(project: project, mainTask: mainTask, hardware: hardware)
+        run(DesignProject(single: project), stages: stages, mainTask: mainTask, hardware: hardware, toolchainNote: toolchainNote)
+    }
+
+    static func run(_ design: DesignProject, stages: [FlowStage] = FlowStage.fullCompilation, mainTask: String = "Compilation",
+                    hardware: HardwareConfig? = nil, toolchainNote: String? = nil) -> FlowState {
+        var state = FlowState(design: design, mainTask: mainTask, hardware: hardware)
         state.toolchainNote = toolchainNote
         for stage in stages {
             let t = Date()
@@ -329,20 +350,39 @@ enum CompileFlow {
     // MARK: - Stage bodies
 
     static func elaborate(_ p: Project) -> (CompiledCircuit?, [Message]) {
+        let (c, ms, _) = elaborate(DesignProject(single: p))
+        return (c, ms)
+    }
+
+    /// Analysis & Elaboration of every sheet used under the top, then of the flattened design.
+    static func elaborate(_ d: DesignProject) -> (CompiledCircuit?, [Message], FlatDesign?) {
         var ms: [Message] = []
-        let e = p.entityName
-        ms.append(Message(level: .info, text: "Found 1 design units, including 1 entities, in source file \(e).bdf",
-                          children: [Message(level: .info, text: "Found entity 1: \(e)")]))
-        ms.append(Message(level: .info, text: "Elaborating entity \"\(e)\" for the top level hierarchy"))
-        let (c, check) = Compiler.compile(p, checkLocations: false)
+        let top = d.top?.entityName ?? d.topLevelEntity
+        let used = d.usedSheets()
+        for e in used {
+            ms.append(Message(level: .info, text: "Found 1 design units, including 1 entities, in source file \(e).bdf",
+                              children: [Message(level: .info, text: "Found entity 1: \(e)")]))
+        }
+        ms.append(Message(level: .info, text: "Elaborating entity \"\(top)\" for the top level hierarchy"))
+        var seen: Set<String> = [top.lowercased()]
+        d.instanceTree().walk { n, path in
+            guard !path.isEmpty, !n.missing, !n.recursive, seen.insert(n.entity.lowercased()).inserted else { return }
+            let hierarchy = (path.dropFirst().map(\.label) + [n.label]).joined(separator: "|")
+            ms.append(Message(level: .info, text: "Elaborating entity \"\(n.entity)\" for hierarchy \"\(hierarchy)\""))
+        }
+        let (c, check, flat) = Compiler.compile(d, checkLocations: false)
         // The design check's own summary lines are replaced by the flow's messages.
         ms += check.filter { $0.level != .info }.filter { !$0.text.hasPrefix("Design check failed") }
-        let routing = Routing(project: p, conn: Connectivity(p))
-        ms += routing.warnings.map { Message(level: .warning, text: $0) }
-        if !routing.labeledWires.isEmpty {
-            ms.append(Message(level: .info, text: "\(routing.labeledWires.count) wire(s) will be exported to \(e).bdf as matching net labels, so they don't touch other wires"))
+        for e in used {
+            guard let s = d.sheet(named: e) else { continue }
+            let routing = Routing(project: s, conn: Connectivity(s))
+            let sheet = e == top ? nil : e
+            ms += routing.warnings.map { Message(level: .warning, text: used.count > 1 ? "\(e).bdf: \($0)" : $0, sheet: sheet) }
+            if !routing.labeledWires.isEmpty {
+                ms.append(Message(level: .info, text: "\(routing.labeledWires.count) wire(s) will be exported to \(e).bdf as matching net labels, so they don't touch other wires"))
+            }
         }
-        return (c, ms)
+        return (c, ms, flat)
     }
 
     static func synthesisMessages(_ s: SynthesisResult, project: Project) -> [Message] {
@@ -399,7 +439,7 @@ enum CompileFlow {
         nodes.append(ReportNode(id: "flow.summary", title: "Flow Summary", icon: .table, tables: [ReportTableData(title: "Flow Summary", rows: [
             ["Flow Status", "\(ok ? "Successful" : "Failed") - \(when)"],
             ["Quartzite Version", "\(version) (Quartzite for Mac; not Intel Quartus Prime)"],
-            ["Revision Name", p.entityName],
+            ["Revision Name", state.design.projectName],
             ["Top-level Entity Name", p.entityName],
             ["Family", CycloneV.family],
             ["Device", p.device],
@@ -420,7 +460,7 @@ enum CompileFlow {
         nodes.append(ReportNode(id: "flow.settings", title: "Flow Settings", icon: .table, tables: [ReportTableData(title: "Flow Settings", header: ["Option", "Setting"], rows: [
             ["Start date & time", shortDateTime(state.started)],
             ["Main task", state.mainTask],
-            ["Revision Name", p.entityName],
+            ["Revision Name", state.design.projectName],
         ])]))
         nodes.append(ReportNode(id: "flow.elapsed", title: "Flow Elapsed Time", icon: .table, tables: [ReportTableData(title: "Flow Elapsed Time", header: ["Module Name", "Elapsed Time"],
             rows: state.runs.map { [$0.stage.toolName, elapsed($0.elapsed)] } + [["Total", elapsed(state.runs.reduce(0) { $0 + $1.elapsed })]])]))
@@ -466,6 +506,23 @@ enum CompileFlow {
         }
     }
 
+    /// One row per entity instance, as Quartus lists the hierarchy. LUTs are mapped after
+    /// flattening, so only the top row has ALUTs; schematic gates are "total (own)".
+    static func entityTable(_ f: FlatDesign, resources r: SynthesisResult.Resources) -> ReportTableData {
+        var rows: [[String]] = []
+        f.hierarchy.walk { n, path in
+            let full = "|" + (path.map(\.label) + [n.label]).joined(separator: "|")
+            let node = path.isEmpty ? "|\(n.entity)" : String(repeating: " ", count: 3 * path.count) + "|\(n.label)|"
+            rows.append([node, path.isEmpty ? "\(r.luts) (\(r.luts))" : "--", "\(n.totalGates) (\(n.ownGates))", "0 (0)", "0", "0",
+                         path.isEmpty ? "\(r.inputPins + r.outputPins)" : "0", full, n.entity, n.isMacro ? "maxplus2" : "work"])
+        }
+        return ReportTableData(title: "Analysis & Synthesis Resource Utilization by Entity",
+                               header: ["Compilation Hierarchy Node", "Combinational ALUTs", "Schematic Gates", "Dedicated Logic Registers", "Block Memory Bits",
+                                        "DSP Blocks", "Pins", "Full Hierarchy Name", "Entity Name", "Library Name"],
+                               rows: rows,
+                               note: "LUTs are mapped after the hierarchy is flattened, so Combinational ALUTs are given for the top-level entity only. Schematic Gates counts the gates drawn in each entity and everything below it (total (own)); library macros count the gates Quartzite models them with.")
+    }
+
     static func stageReport(_ run: StageRun, state: FlowState) -> ReportNode {
         let p = state.project
         let when = dateTime(run.started.addingTimeInterval(run.elapsed))
@@ -479,7 +536,7 @@ enum CompileFlow {
             kids.append(ReportNode(id: id + ".summary", title: "Summary", icon: .table, tables: [ReportTableData(title: "\(name) Summary", rows: [
                 ["\(name) Status", statusLine(run, when)],
                 ["Quartzite Version", version],
-                ["Revision Name", p.entityName],
+                ["Revision Name", state.design.projectName],
                 ["Top-level Entity Name", p.entityName],
                 ["Family", CycloneV.family],
                 ["Logic utilization (in ALMs)", "N/A"],
@@ -498,8 +555,12 @@ enum CompileFlow {
                 ["Two-level minimization", "Quine-McCluskey, Petrick's method (exact up to \(Synthesizer.minimizeLimit) inputs per output)"],
                 ["Technology mapping", "6-input LUTs; Shannon decomposition above 6 inputs"],
             ])]))
+            let sheets = state.flat?.sheetsUsed ?? [p.entityName]
+            let macros = state.flat?.macrosUsed ?? []
+            let fileRows = sheets.map { ["\($0).bdf", "yes", "User Block Diagram/Schematic File"] }
+                + macros.map { m in ["\(m) (\((MacroLibrary.named(m)?.library ?? []).joined(separator: "/")))", "yes", "Library macro (modelled by Quartzite)"] }
             kids.append(ReportNode(id: id + ".files", title: "Source Files Read", icon: .table, tables: [ReportTableData(title: "\(name) Source Files Read",
-                header: ["File Name with User-Entered Path", "Used in Netlist", "File Type"], rows: [["\(p.entityName).bdf", "yes", "User Block Diagram/Schematic File"]])]))
+                header: ["File Name with User-Entered Path", "Used in Netlist", "File Type"], rows: fileRows)]))
             if let s {
                 let r = s.resources
                 kids.append(ReportNode(id: id + ".resources", title: "Resource Usage Summary", icon: .table, tables: [ReportTableData(title: "Analysis & Synthesis Resource Usage Summary", header: ["Resource", "Usage"], rows: [
@@ -523,9 +584,13 @@ enum CompileFlow {
                     ["Total fan-out", "\(r.totalFanout)"],
                     ["Average fan-out", String(format: "%.2f", r.averageFanout)],
                 ], note: "ALMs are estimated by packing LUT pairs under the Cyclone V normal-mode rules; Quartus' Fitter may pack differently.")]))
-                kids.append(ReportNode(id: id + ".entity", title: "Resource Utilization by Entity", icon: .table, tables: [ReportTableData(title: "Analysis & Synthesis Resource Utilization by Entity",
-                    header: ["Compilation Hierarchy Node", "Combinational ALUTs", "Dedicated Logic Registers", "Block Memory Bits", "DSP Blocks", "Pins", "Entity Name"],
-                    rows: [["|\(p.entityName)", "\(r.luts) (\(r.luts))", "0 (0)", "0", "0", "\(r.inputPins + r.outputPins)", p.entityName]])]))
+                if let f = state.flat, !f.identity {
+                    kids.append(ReportNode(id: id + ".entity", title: "Resource Utilization by Entity", icon: .table, tables: [entityTable(f, resources: r)]))
+                } else {
+                    kids.append(ReportNode(id: id + ".entity", title: "Resource Utilization by Entity", icon: .table, tables: [ReportTableData(title: "Analysis & Synthesis Resource Utilization by Entity",
+                        header: ["Compilation Hierarchy Node", "Combinational ALUTs", "Dedicated Logic Registers", "Block Memory Bits", "DSP Blocks", "Pins", "Entity Name"],
+                        rows: [["|\(p.entityName)", "\(r.luts) (\(r.luts))", "0 (0)", "0", "0", "\(r.inputPins + r.outputPins)", p.entityName]])]))
+                }
                 kids.append(ReportNode(id: id + ".equations", title: "Equations (LUT masks)", icon: .table, tables: [ReportTableData(title: "Synthesized LUTs (Quartzite)",
                     header: ["Node", "Inputs", "LUT mask", "Equation", "Level"],
                     rows: s.network.luts.indices.map { i -> [String] in
@@ -554,7 +619,7 @@ enum CompileFlow {
                 kids.append(ReportNode(id: id + ".summary", title: "Summary", icon: .table, tables: [ReportTableData(title: "Fitter Summary", rows: [
                     ["Fitter Status", statusLine(run, when)],
                     ["Quartzite Version", version],
-                    ["Revision Name", p.entityName],
+                    ["Revision Name", state.design.projectName],
                     ["Top-level Entity Name", p.entityName],
                     ["Family", CycloneV.family],
                     ["Device", p.device],
@@ -627,7 +692,7 @@ enum CompileFlow {
         case .assembler:
             var rows = [
                 ["Assembler Status", statusLine(run, when)],
-                ["Revision Name", p.entityName],
+                ["Revision Name", state.design.projectName],
                 ["Top-level Entity Name", p.entityName],
                 ["Family", CycloneV.family],
                 ["Device", p.device],
@@ -674,7 +739,7 @@ enum CompileFlow {
         case .eda:
             kids.append(ReportNode(id: id + ".summary", title: "Summary", icon: .table, tables: [ReportTableData(title: "EDA Netlist Writer Summary", rows: [
                 ["EDA Netlist Writer Status", statusLine(run, when)],
-                ["Revision Name", p.entityName],
+                ["Revision Name", state.design.projectName],
                 ["Top-level Entity Name", p.entityName],
                 ["Family", CycloneV.family],
                 ["Simulation Files Creation", run.status == .failed ? "Failed" : "Successful"],

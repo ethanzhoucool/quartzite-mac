@@ -12,9 +12,13 @@ enum NetlistWriter {
     /// The netlist file for an export bundle (path relative to the project folder), or nil
     /// if the design does not compile.
     static func bundleFile(_ p: Project, date: Date = Date()) -> (name: String, contents: String)? {
-        let state = CompileFlow.run(p, stages: [.analysisSynthesis, .fitter, .eda], mainTask: "EDA Netlist Writer")
+        bundleFile(DesignProject(single: p), date: date)
+    }
+
+    static func bundleFile(_ d: DesignProject, date: Date = Date()) -> (name: String, contents: String)? {
+        let state = CompileFlow.run(d, stages: [.analysisSynthesis, .fitter, .eda], mainTask: "EDA Netlist Writer")
         guard let text = state.netlist else { return nil }
-        return (path(p.entityName), text)
+        return (path(state.project.entityName), text)
     }
 
     static func quartusDate(_ d: Date) -> String {

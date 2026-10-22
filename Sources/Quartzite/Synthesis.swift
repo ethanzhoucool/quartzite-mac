@@ -204,60 +204,15 @@ enum Synthesizer {
         // Redundant gates.
         let removed = redundantGates(c, tables: tables, project: project)
 
-        // Two-level minimization per output, over its support.
-        var outs: [SynthesisResult.OutputFunction] = []
-        for (i, o) in c.outputs.enumerated() {
-            let f = outTables[i]
-            let supportBits = f.support
-            let support = supportBits.map { n - 1 - $0 }
-            var sop: [Cube] = [], off: [Cube] = []
-            var exact = true, minimized = true, method = "", primes = 0
-            if let v = f.constantValue {
-                sop = v ? [Cube(value: 0, care: 0)] : []
-                off = v ? [] : [Cube(value: 0, care: 0)]
-                method = "constant"
-            } else if supportBits.count <= minimizeLimit {
-                let k = supportBits.count
-                // Local function over the support, local bit j = global bit supportBits[k-1-j].
-                func local(_ g: TruthTable) -> TruthTable {
-                    TruthTable(n: k) { m in
-                        var gm = 0
-                        for j in 0..<k where (m >> j) & 1 == 1 { gm |= 1 << supportBits[k - 1 - j] }
-                        return g[gm]
-                    }
-                }
-                func lift(_ cube: Cube) -> Cube {
-                    var v: UInt32 = 0, care: UInt32 = 0
-                    for j in 0..<k where cube.care & (1 << UInt32(j)) != 0 {
-                        let gb = UInt32(1) << UInt32(supportBits[k - 1 - j])
-                        care |= gb
-                        if cube.value & (1 << UInt32(j)) != 0 { v |= gb }
-                    }
-                    return Cube(value: v, care: care)
-                }
-                let lf = local(f)
-                let r = Minimizer.minimize(on: lf)
-                let rOff = Minimizer.minimize(on: !lf)
-                sop = r.cubes.map(lift).sorted()
-                off = rOff.cubes.map(lift).sorted()
-                exact = r.exact && rOff.exact
-                method = r.method
-                primes = r.primeCount
-            } else {
-                minimized = false
-                exact = false
-                method = "not minimized (depends on \(supportBits.count) inputs; limit \(minimizeLimit))"
+        // Two-level minimization per output, over its support, one output per thread.
+        var results = [SynthesisResult.OutputFunction?](repeating: nil, count: c.outputs.count)
+        results.withUnsafeMutableBufferPointer { buf in
+            DispatchQueue.concurrentPerform(iterations: c.outputs.count) { i in
+                let o = c.outputs[i]
+                buf[i] = minimizeOutput(outTables[i], name: o.name, id: o.id, n: n, names: names)
             }
-            outs.append(SynthesisResult.OutputFunction(
-                name: o.name, id: o.id, table: f, support: support, minimized: minimized, exact: exact, method: method,
-                primeCount: primes, sop: sop, posOff: off,
-                sopEquation: minimized ? Equation.sop(sop, names: names) : "(not minimized)",
-                posEquation: minimized ? Equation.pos(offCubes: off, names: names) : "(not minimized)",
-                textbookSOP: minimized ? Equation.textbookSOP(sop, names: names) : "",
-                textbookPOS: minimized ? Equation.textbookPOS(offCubes: off, names: names) : "",
-                sopCost: Equation.cost(sop, pos: false, bits: n), posCost: Equation.cost(off, pos: true, bits: n),
-                driver: .constant(false)))
         }
+        var outs = results.map { $0! }
 
         // Technology mapping to 6-input LUTs.
         var mapper = LUTMapper(n: n, inputNames: inputNames)
@@ -283,12 +238,67 @@ enum Synthesizer {
             .map { (term: Equation.sop([$0], names: names), outputs: termOwners[$0]!) }
 
         var gates = 0, gateInputs = 0
-        for g in c.gateOrder where g.kind.isGate { gates += 1; gateInputs += g.kind.arity }
+        for g in c.gateOrder where g.kind.isGate && !c.generated.contains(g.id) { gates += 1; gateInputs += g.kind.arity }
 
         return SynthesisResult(inputNames: inputNames, outputs: outs, network: net, removed: removed,
                                unusedInputs: unused, sharedTerms: shared,
                                resources: resources(net, inputs: n, outputs: c.outputs.count),
                                schematicGates: gates, schematicGateInputs: gateInputs)
+    }
+
+    /// Minimal SOP and POS of one output over its support. Outputs that depend on more than
+    /// 8 inputs are minimized with `Minimizer.wideLimits`.
+    static func minimizeOutput(_ f: TruthTable, name: String, id: UUID, n: Int, names: Equation.Names) -> SynthesisResult.OutputFunction {
+        let supportBits = f.support
+        let support = supportBits.map { n - 1 - $0 }
+        var sop: [Cube] = [], off: [Cube] = []
+        var exact = true, minimized = true, method = "", primes = 0
+        if let v = f.constantValue {
+            sop = v ? [Cube(value: 0, care: 0)] : []
+            off = v ? [] : [Cube(value: 0, care: 0)]
+            method = "constant"
+        } else if supportBits.count <= minimizeLimit {
+            let k = supportBits.count
+            // Local function over the support, local bit j = global bit supportBits[k-1-j].
+            func local(_ g: TruthTable) -> TruthTable {
+                TruthTable(n: k) { m in
+                    var gm = 0
+                    for j in 0..<k where (m >> j) & 1 == 1 { gm |= 1 << supportBits[k - 1 - j] }
+                    return g[gm]
+                }
+            }
+            func lift(_ cube: Cube) -> Cube {
+                var v: UInt32 = 0, care: UInt32 = 0
+                for j in 0..<k where cube.care & (1 << UInt32(j)) != 0 {
+                    let gb = UInt32(1) << UInt32(supportBits[k - 1 - j])
+                    care |= gb
+                    if cube.value & (1 << UInt32(j)) != 0 { v |= gb }
+                }
+                return Cube(value: v, care: care)
+            }
+            let lf = local(f)
+            let limits = k > 8 ? Minimizer.wideLimits : nil
+            let r = Minimizer.minimize(on: lf, limits: limits)
+            let rOff = Minimizer.minimize(on: !lf, limits: limits)
+            sop = r.cubes.map(lift).sorted()
+            off = rOff.cubes.map(lift).sorted()
+            exact = r.exact && rOff.exact
+            method = r.method
+            primes = r.primeCount
+        } else {
+            minimized = false
+            exact = false
+            method = "not minimized (depends on \(supportBits.count) inputs; limit \(minimizeLimit))"
+        }
+        return SynthesisResult.OutputFunction(
+            name: name, id: id, table: f, support: support, minimized: minimized, exact: exact, method: method,
+            primeCount: primes, sop: sop, posOff: off,
+            sopEquation: minimized ? Equation.sop(sop, names: names) : "(not minimized)",
+            posEquation: minimized ? Equation.pos(offCubes: off, names: names) : "(not minimized)",
+            textbookSOP: minimized ? Equation.textbookSOP(sop, names: names) : "",
+            textbookPOS: minimized ? Equation.textbookPOS(offCubes: off, names: names) : "",
+            sopCost: Equation.cost(sop, pos: false, bits: n), posCost: Equation.cost(off, pos: true, bits: n),
+            driver: .constant(false))
     }
 
     // MARK: - Redundant logic
@@ -310,8 +320,10 @@ enum Synthesizer {
         var earlier: [(TruthTable, String)] = []
         let zero = TruthTable(n: n)
         for g in c.gateOrder where g.kind.isGate {
+            let gname = c.displayNames[g.id] ?? g.name
+            guard !c.generated.contains(g.id) else { continue }
             guard live.contains(g.id) else {
-                removed.append(.init(name: g.name, kind: g.kind, id: g.id, reason: .noFanout))
+                removed.append(.init(name: gname, kind: g.kind, id: g.id, reason: .noFanout))
                 continue
             }
             guard let outNet = c.conn.netOf[PortRef(comp: g.id, port: g.kind.arity)] else { continue }
@@ -329,8 +341,8 @@ enum Synthesizer {
             } else if g.kind.family != .not, let k = (0..<n).first(where: { f == !TruthTable.variable(n - 1 - $0, n: n) }) {
                 reason = .equalsInput(c.inputs[k].name, inverted: true)
             }
-            if let reason { removed.append(.init(name: g.name, kind: g.kind, id: g.id, reason: reason)) }
-            earlier.append((f, g.name))
+            if let reason { removed.append(.init(name: gname, kind: g.kind, id: g.id, reason: reason)) }
+            earlier.append((f, gname))
         }
         return removed
     }

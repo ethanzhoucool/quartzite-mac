@@ -189,7 +189,17 @@ enum Minimizer {
         return primes.filter { p in ons.contains { p.covers($0) } }.sorted()
     }
 
-    static func minimize(on: TruthTable, dc: TruthTable? = nil) -> Result {
+    /// Search limits for functions of many inputs. Above `greedyAbovePrimes` prime implicants
+    /// the cover is chosen greedily; otherwise branch and bound stops after `nodeLimit` nodes.
+    struct Limits {
+        var nodeLimit: Int
+        var greedyAbovePrimes: Int
+    }
+
+    /// Limits for outputs that depend on 9 to 12 inputs (deterministic: node counts, no clock).
+    static let wideLimits = Limits(nodeLimit: 20_000, greedyAbovePrimes: 1500)
+
+    static func minimize(on: TruthTable, dc: TruthTable? = nil, limits: Limits? = nil) -> Result {
         if on.isZero { return Result(cubes: [], primeCount: 0, essentialCount: 0, exact: true, method: "constant") }
         let careSet = dc.map { on | $0 } ?? on
         if careSet.isOne { return Result(cubes: [Cube(value: 0, care: 0)], primeCount: 1, essentialCount: 1, exact: true, method: "constant") }
@@ -202,7 +212,14 @@ enum Minimizer {
             for (p, c) in primes.enumerated() where c.covers(m) { cover[p][r >> 6] |= 1 << UInt64(r & 63) }
         }
         let lits = primes.map { $0.literalCount }
-        let sol = CoverSolver(rows: ons.count, cover: cover, literals: lits).solve()
+        if let limits, primes.count > limits.greedyAbovePrimes {
+            let pick = greedyCover(rows: ons.count, cover: cover, literals: lits)
+            return Result(cubes: pick.map { primes[$0] }.sorted(), primeCount: primes.count, essentialCount: 0, exact: false,
+                          method: "best cover found (search limit)")
+        }
+        var solver = CoverSolver(rows: ons.count, cover: cover, literals: lits)
+        if let limits { solver.nodeLimit = limits.nodeLimit }
+        let sol = solver.solve()
         let method: String
         switch sol.method {
         case .reduction: method = "Quine-McCluskey (essential and dominating prime implicants)"
@@ -211,6 +228,26 @@ enum Minimizer {
         }
         return Result(cubes: sol.chosen.map { primes[$0] }.sorted(), primeCount: primes.count,
                       essentialCount: sol.essentials, exact: sol.exact, method: method)
+    }
+
+    /// Repeatedly takes the prime covering the most uncovered rows (fewer literals, then the
+    /// lower index, on ties).
+    static func greedyCover(rows: Int, cover: [[UInt64]], literals: [Int]) -> [Int] {
+        var open = [UInt64](repeating: 0, count: (rows + 63) / 64)
+        for r in 0..<rows { open[r >> 6] |= 1 << UInt64(r & 63) }
+        var chosen: [Int] = []
+        while open.contains(where: { $0 != 0 }) {
+            var best = -1, bestGain = 0
+            for (p, c) in cover.enumerated() {
+                var gain = 0
+                for i in c.indices { gain += (c[i] & open[i]).nonzeroBitCount }
+                if gain > bestGain || (gain == bestGain && gain > 0 && best >= 0 && literals[p] < literals[best]) { best = p; bestGain = gain }
+            }
+            guard best >= 0 else { break }
+            chosen.append(best)
+            for i in open.indices { open[i] &= ~cover[best][i] }
+        }
+        return chosen
     }
 
     /// Petrick's method: multiply out the product of sums (one sum per uncovered minterm),
