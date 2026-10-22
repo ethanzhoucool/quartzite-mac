@@ -37,6 +37,7 @@ enum HierarchySelfTest {
         symbols(check)
         model(check)
         sheetOps(check)
+        writers(check)
     }
 
     /// HA and FA (two HA blocks), top FA, symbols created.
@@ -163,6 +164,73 @@ enum HierarchySelfTest {
         check(legacy.symbol == nil && legacy.id == nil
               && !(String(data: (try? JSONEncoder().encode(legacy)) ?? Data(), encoding: .utf8) ?? "").contains("\"symbol\""),
               "a single-sheet project without a symbol still saves without the new keys")
+    }
+
+    // MARK: - Writers (plan 1.6)
+
+    /// hiertop with HA at (240,272) "inst" and BIGBLK at (240,720) "inst1", as in the fixture.
+    static func hiertop() -> DesignProject {
+        var db = TestDesigns.DesignBuilder("hiertop")
+        for (n, ins, outs) in [("HA", ["x", "y"], ["s", "cout"]), ("BIGBLK", ["a_long_input", "b"], ["result_out", "z"])] {
+            var p = fixtureSheet(n, ins: ins, outs: outs)
+            p.id = UUID()
+            db.d.sheets.append(p)
+            db.createSymbol(n)
+        }
+        var b = db.builder("hiertop")
+        b.block("HA", x: 240, y: 272)
+        b.block("BIGBLK", x: 240, y: 720)
+        db.sheet(b)
+        return db.d
+    }
+
+    static func bdf(_ p: Project) -> String { QuartusExport.bdf(p, routing: Routing(project: p, conn: Connectivity(p))) }
+
+    /// Names of the (pin ...) blocks of a .bdf, in file order.
+    static func pinNames(_ bdf: String) -> [String] {
+        ((try? SExprParser.parse(bdf)) ?? []).filter { $0.head == "pin" }.compactMap { $0.children("text").dropFirst().first?.items.dropFirst().first?.stringValue }
+    }
+
+    static func writers(_ check: Check) {
+        print("Hierarchical .bdf and .qsf")
+        let d = hiertop()
+        let top = d.top!
+        check(top.components.map(\.name) == ["inst", "inst1"], "hiertop instances are inst and inst1")
+        let ours = bdf(top)
+        if let t = fixture("hier/hiertop.bdf", check) {
+            check(tokens(String(afterComments(ours))) == tokens(String(afterComments(t))),
+                  "hiertop.bdf: the HA and BIGBLK instances have the same tokens as Quartus' (lines 22-93)")
+        }
+        check(!ours.contains("\r"), "a .bdf with blocks uses LF line endings")
+
+        var ha = fixtureSheet("HA", ins: ["y", "x"], outs: ["s"])
+        check(pinNames(bdf(ha)) == ["y", "x", "s"], "a sheet without a symbol writes its pins in component order")
+        ha.symbol = SymbolGenerator.symbol(for: ha)
+        ha.components.append(Component(kind: .input, name: "late", x: 40, y: 20))
+        check(ha.symbol?.inputs.map(\.name) == ["y", "x"] && pinNames(bdf(ha)) == ["y", "x", "late", "s"],
+              "a sheet with a symbol writes its pins in symbol port order, new pins last")
+        ha.components.swapAt(0, 1)
+        check(pinNames(bdf(ha)) == ["y", "x", "late", "s"], "symbol port order wins over component order")
+
+        let qsf = QuartusExport.qsf(d, top: top, date: Date(timeIntervalSince1970: 0))
+        let files = qsf.split(separator: "\n").filter { $0.contains("BDF_FILE") }
+        check(files == ["set_global_assignment -name BDF_FILE hiertop.bdf", "set_global_assignment -name BDF_FILE HA.bdf",
+                        "set_global_assignment -name BDF_FILE BIGBLK.bdf"], "the .qsf lists hiertop.bdf, HA.bdf, BIGBLK.bdf (got \(files))")
+        check(qsf.contains("TOP_LEVEL_ENTITY hiertop\n"), "the .qsf names hiertop as the top-level entity")
+        var unused = d
+        _ = try? unused.addSheet(named: "Unused")
+        check(!QuartusExport.qsf(unused, top: top, date: Date()).contains("Unused.bdf"), "sheets not used under the top are not listed")
+        let legacy = TestDesigns.exampleSOP()
+        check(QuartusExport.qsf(legacy, date: Date(timeIntervalSince1970: 0)) == QuartusExport.qsf(DesignProject(single: legacy), top: legacy, date: Date(timeIntervalSince1970: 0)),
+              "a one-sheet design writes the same .qsf as before")
+
+        var vg = TestDesigns.Builder("vg")
+        vg.vcc(x: 304, y: 208)
+        let v = bdf(vg.p)
+        if let t = fixture("lab2/vcc_symbol.txt", check) {
+            check(v.replacingOccurrences(of: "\"inst\"", with: "\"vcc_ctl\"").contains(t.replacingOccurrences(of: "\r\n", with: "\n")),
+                  "a VCC on a sheet is written exactly as Quartus writes it")
+        }
     }
 
     // MARK: - Sheet operations (plan 1.4)

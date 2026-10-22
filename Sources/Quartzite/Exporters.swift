@@ -60,14 +60,19 @@ enum QuartusExport {
         """
     }
 
-    static func qsf(_ p: Project, date: Date) -> String {
+    static func qsf(_ p: Project, date: Date) -> String { qsf(DesignProject(single: p), top: p, date: date) }
+
+    /// The settings file of a design: one BDF_FILE per sheet used under `top` (top first),
+    /// and the pin assignments of `top`.
+    static func qsf(_ d: DesignProject, top p: Project, date: Date) -> String {
         let e = p.entityName
+        let files = d.usedSheets(from: e).map { "set_global_assignment -name BDF_FILE \($0).bdf" }.joined(separator: "\n")
         var s = """
         # Quartus Prime settings file written by Quartzite for Mac.
-        # Device: DE10-Standard (Cyclone V SoC \(p.device))
+        # Device: DE10-Standard (Cyclone V SoC \(d.device))
 
         set_global_assignment -name FAMILY "Cyclone V"
-        set_global_assignment -name DEVICE \(p.device)
+        set_global_assignment -name DEVICE \(d.device)
         set_global_assignment -name TOP_LEVEL_ENTITY \(e)
         set_global_assignment -name ORIGINAL_QUARTUS_VERSION 18.0.0
         set_global_assignment -name PROJECT_CREATION_TIME_DATE "\(quartusDate(date).uppercased())"
@@ -78,7 +83,7 @@ enum QuartusExport {
         set_global_assignment -name EDA_SIMULATION_TOOL "ModelSim-Altera (Verilog)"
         set_global_assignment -name EDA_TIME_SCALE "1 ps" -section_id eda_simulation
         set_global_assignment -name EDA_OUTPUT_DATA_FORMAT "VERILOG HDL" -section_id eda_simulation
-        set_global_assignment -name BDF_FILE \(e).bdf
+        \(files)
         set_global_assignment -name VECTOR_WAVEFORM_FILE Waveform.vwf
 
         """
@@ -138,9 +143,9 @@ enum QuartusExport {
         (header "graphic" (version "1.4"))
 
         """
-        for c in p.components where c.kind == .input { out += inputPin(c) }
-        for c in p.components where c.kind == .output { out += outputPin(c) }
-        for c in p.components where !c.kind.isPin { out += symbol(c) }
+        for c in symbolOrder(p.components.filter { $0.kind == .input }, p.symbol?.inputs) { out += inputPin(c) }
+        for c in symbolOrder(p.components.filter { $0.kind == .output }, p.symbol?.outputs) { out += outputPin(c) }
+        for c in p.components where !c.kind.isPin { out += librarySymbol(c) ?? symbol(c) }
         for s in routing.segments {
             out += "(connector\n\t(pt \(i(s.a.x)) \(i(s.a.y)))\n\t(pt \(i(s.b.x)) \(i(s.b.y)))\n)\n"
         }
@@ -153,6 +158,19 @@ enum QuartusExport {
         for j in routing.junctions { out += "(junction (pt \(i(j.x)) \(i(j.y))))\n" }
         for n in p.notes ?? [] where !n.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { out += note(n) }
         return out
+    }
+
+    /// A sheet with a symbol lists its pins in the symbol's port order; pins added since come last.
+    private static func symbolOrder(_ pins: [Component], _ ports: [SymPort]?) -> [Component] {
+        guard let ports else { return pins }
+        func rank(_ c: Component) -> Int { ports.firstIndex { $0.name.caseInsensitiveCompare(c.name) == .orderedSame } ?? ports.count }
+        return pins.enumerated().sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }.map(\.element)
+    }
+
+    /// A block, library macro, VCC or GND: the symbol's own text, as Quartus copies it into the .bdf.
+    private static func librarySymbol(_ c: Component) -> String? {
+        guard c.kind.isHierarchical || c.kind == .vcc || c.kind == .gnd, let def = c.symbol ?? c.builtinSymbol else { return nil }
+        return def.text(rect: CGPoint(x: c.x, y: c.y), instance: c.name, lineEnding: "\n")
     }
 
     private static func i(_ v: CGFloat) -> Int { Int(v.rounded()) }
