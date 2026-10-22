@@ -1,7 +1,7 @@
 # Quartus 18.0 Lite: custom block symbols (ground truth)
 
 Captured 2026-10-22 from real Quartus Prime 18.0.0 Build 614 Lite on the
-Western AppsAnywhere PCs. Every file in this folder except HA.bdf, BIGBLK.bdf,
+a university lab PC. Every file in this folder except HA.bdf, BIGBLK.bdf,
 hiertest.qpf and hiertest.qsf was written by Quartus itself.
 
 | File | How it was made |

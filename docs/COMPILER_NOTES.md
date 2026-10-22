@@ -46,7 +46,7 @@ datad=z), so its masks can differ from Quartus' for the same function; the repor
   against the "All Package Pins" table Quartus wrote when it fitted that golden top
   (106 signals). There were 0 mismatches. The I/O standards are the golden top's
   (CLOCK3_50 2.5 V, everything else 3.3-V LVTTL), except the slide switches: the golden
-  top has them at 2.5 V (their bank voltage depends on jumper JP3), but the ECE 2277 lab
+  top has them at 2.5 V (their bank voltage depends on jumper JP3), but typical DE10-Standard lab
   manuals assign 3.3-V LVTTL to every pin, so Quartzite does too. The exported `.qsf` and
   `_pins.qsf` write them as `set_instance_assignment -name IO_STANDARD` lines after the
   locations, as Quartus saves them. Without them Quartus compiles every pin at its 2.5 V
