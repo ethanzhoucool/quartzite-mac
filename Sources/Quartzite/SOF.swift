@@ -301,10 +301,14 @@ struct SOFFile {
         }
         if let c = computedChecksum(), let s = storedChecksum {
             lines.append(String(format: "checksum: stored 0x%08X computed 0x%08X %@", s, c, s == c ? "OK" : "MISMATCH"))
+        } else {
+            lines.append(storedChecksum == nil ? "checksum: missing" : "checksum: not computable (CRAM or PRAM record missing or malformed)")
         }
         if let s = storedCRC {
             let c = computedCRC()!
             lines.append(String(format: "file CRC: stored 0x%04X computed 0x%04X %@", s, c, s == c ? "OK" : "MISMATCH"))
+        } else {
+            lines.append("file CRC: missing")
         }
         return lines
     }

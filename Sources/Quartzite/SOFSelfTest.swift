@@ -126,6 +126,14 @@ enum SOFSelfTest {
             broken.records[di].body = Data("5CSXFC6\0".utf8)
             broken.updateCRC()
             check((try? broken.extractRBF()) == nil, "a .sof whose device record is only a die prefix is not converted")
+            check(sof.info().contains { $0.hasPrefix("file CRC:") && $0.hasSuffix(" OK") } && sof.info().contains { $0.hasPrefix("checksum:") && $0.hasSuffix(" OK") },
+                  "--sof-info reports a valid CRC and checksum as OK")
+            var crcTagged = sof.serialize()
+            crcTagged[crcTagged.count - 8] ^= 1   // the CRC record's tag
+            if let damaged = try? SOFFile(data: crcTagged) {
+                check(damaged.info().contains("file CRC: missing") && (try? damaged.validate()) == nil,
+                      "--sof-info says the file CRC is missing when the CRC record's tag is damaged, and the file is invalid")
+            } else { check(false, "damaged CRC tag still parses") }
             for size in [0, 0x15, 109] {
                 broken = sof
                 let oi = broken.records.firstIndex { $0.tag == SOFFile.Tag.options }!

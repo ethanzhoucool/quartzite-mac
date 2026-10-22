@@ -301,7 +301,7 @@ $Q --rbf-to-sof control.rbf 5CSXFC6D6F31C6 C_q16.sof --project control --layout 
    --compiler-version "Quartus Prime Compiler Version 16.1.2 Build 203 01/18/2017 SJ Standard Edition"
 $Q --rbf-to-sof control.rbf 5CSXFC6D6F31C6 D_template.sof --template control.sof
 cmp D_template.sof control.sof && echo "D is byte-identical to the Quartus file"
-$Q --sof-info B_q17.sof                                                   # checksum and CRC must say OK
+$Q --sof-info B_q17.sof                                                   # checksum and CRC must say OK (exit status 1 if not)
 ```
 
 Copy control.sof, B_q17.sof, C_q16.sof and D_template.sof to the Quartus machine. With the DE10-Standard on

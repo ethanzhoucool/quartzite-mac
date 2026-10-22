@@ -117,6 +117,7 @@ enum CLI {
                 // Quartzite --sof-info <file.sof>
                 let sof = try SOFFile(contentsOf: URL(fileURLWithPath: file))
                 sof.info().forEach { print($0) }
+                try sof.validate()   // exit 1 on a mismatched or missing CRC or checksum, as conversion would refuse the file
                 return 0
             }
             if let i = args.firstIndex(of: "--sof-to-rbf"), i + 2 < args.count {
