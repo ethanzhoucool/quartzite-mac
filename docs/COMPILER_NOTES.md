@@ -45,7 +45,10 @@ datad=z), so its masks can differ from Quartus' for the same function; the repor
   cross-checked against `menotti/ld labs/DE10_standard.qsf` (67 overlapping signals) and
   against the "All Package Pins" table Quartus wrote when it fitted that golden top
   (106 signals). There were 0 mismatches. The I/O standards are the golden top's
-  (SW and CLOCK3_50 2.5 V, everything else 3.3-V LVTTL).
+  (SW and CLOCK3_50 2.5 V, everything else 3.3-V LVTTL). The exported `.qsf` and
+  `_pins.qsf` write them as `set_instance_assignment -name IO_STANDARD` lines after the
+  locations, as Quartus saves them. Without them Quartus compiles every pin at its 2.5 V
+  default: Quartus 18.0 built an export that had none with every output at `V2P5_50OHM`.
 - Package table (896 balls: location, pad, I/O bank, type) comes from the same Quartus
   17.0 Fitter report for 5CSXFC6D6F31C6. I/O banks shown in the Pin Planner and reports
   come only from this table. The Pin Planner does not show a VREF group; I have no source
@@ -199,9 +202,6 @@ was successful. 0 errors, 0 warnings", and switched to the Compilation Report ta
   Synthesis). Redo stays Shift-Cmd-Z (the macOS convention) rather than Quartus' Ctrl+Y.
 - The exact set of Messages filter buttons in 18.1. Screenshots show All, Error, Critical
   Warning, Warning and one more icon. I implemented the six the task lists.
-- The default I/O standard Quartus applies when the .qsf has none. I did not want to
-  guess, so the Pin Planner shows the Terasic board standard and labels the column that
-  way.
 - Message wording is copied from Quartus 17.0 Standard reports, not 18.1 Lite. 18.1 calls
   TimeQuest the "Timing Analyzer". Lines with no Quartus equivalent (minimized logic,
   redundant gates, routing not performed) are worded as Quartzite messages.

@@ -83,6 +83,7 @@ enum QuartusExport {
 
         """
         s += locationLines(p)
+        s += ioStandardLines(p)
         s += """
 
         set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
@@ -105,10 +106,21 @@ enum QuartusExport {
         return s
     }
 
+    /// Each board pin's I/O standard, after the locations as Quartus saves them. Without it
+    /// Quartus compiles every pin as its 2.5 V default.
+    static func ioStandardLines(_ p: Project) -> String {
+        var s = ""
+        for pin in p.inputPins + p.outputPins {
+            guard let board = BoardPin.lookup(pin.location) else { continue }
+            s += "set_instance_assignment -name IO_STANDARD \"\(board.ioStandard)\" -to \(pin.name)\n"
+        }
+        return s
+    }
+
     /// Assignments-only file for Assignments > Import Assignments in the lab.
     static func pinAssignments(_ p: Project) -> String {
         "# Pin assignments for \(p.entityName) (DE10-Standard). Import with Assignments > Import Assignments...\n\n"
-            + locationLines(p)
+            + locationLines(p) + ioStandardLines(p)
     }
 
     // MARK: - Block diagram (.bdf)

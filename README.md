@@ -43,10 +43,10 @@ Keep compiling in Quartus for anything graded.
 
 | File | Purpose |
 |---|---|
-| `<project>.qpf`, `<project>.qsf` | Project and settings: Cyclone V 5CSXFC6D6F31C6, top-level entity, pin locations |
+| `<project>.qpf`, `<project>.qsf` | Project and settings: Cyclone V 5CSXFC6D6F31C6, top-level entity, pin locations and each board pin's I/O standard |
 | `<project>.bdf` | The schematic in Quartus Block Editor format |
 | `Waveform.vwf` | Test vectors counting through every input combination |
-| `<project>_pins.qsf` | Pin assignments only, for Assignments > Import Assignments |
+| `<project>_pins.qsf` | Pin locations and I/O standards only, for Assignments > Import Assignments |
 | `<project>_backup.v` | The same circuit as structural Verilog, as a fallback |
 | `README_LAB.txt` | Step-by-step for the lab computer |
 

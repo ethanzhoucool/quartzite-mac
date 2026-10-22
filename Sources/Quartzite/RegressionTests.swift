@@ -18,6 +18,7 @@ enum RegressionTests {
         testInvalidExpectedIsNotAMatch()
         testMalformedAssignmentsAreRejected()
         testNetlistNamesAndFitterFailures()
+        testLabSupportFixes()
         return failures == 0
     }
     static func testMintermSyntaxMustBeFullyValid() {
@@ -310,3 +311,35 @@ extension RegressionTests {
 
 }
 #endif
+
+extension RegressionTests {
+    static func testLabSupportFixes() {
+        testExportWritesIOStandards()
+    }
+
+    /// Quartus compiles a pin without IO_STANDARD as 2.5 V; the LEDs and HEX displays are 3.3-V LVTTL.
+    static func testExportWritesIOStandards() {
+        var p = TestDesigns.exampleSOP()
+        let unplaced = Component(kind: .output, name: "unplaced", x: 800, y: 400)
+        p.components.append(unplaced)
+        p.wires.append(Wire(a: PortRef(comp: p.inputPins[0].id, port: 0), b: PortRef(comp: unplaced.id, port: 0)))
+        guard let bundle = try? QuartusExport.makeBundle(p, conn: Connectivity(p)) else { check(false, "IO_STANDARD fixture exports"); return }
+        for file in ["\(p.entityName).qsf", "\(p.entityName)_pins.qsf"] {
+            guard let text = bundle.files.first(where: { $0.name == file })?.contents else { check(false, "\(file) exported"); continue }
+            let lines = text.split(separator: "\n").map(String.init)
+            for pin in p.inputPins + p.outputPins {
+                guard let board = BoardPin.lookup(pin.location) else {
+                    assertFalse(lines.contains { $0.hasPrefix("set_instance_assignment -name IO_STANDARD") && $0.hasSuffix(" -to \(pin.name)") },
+                                "\(file): no IO_STANDARD for unassigned pin \(pin.name)")
+                    continue
+                }
+                assertTrue(lines.contains("set_instance_assignment -name IO_STANDARD \"\(board.ioStandard)\" -to \(pin.name)"),
+                           "\(file): \(pin.name) on \(board.label) gets IO_STANDARD \"\(board.ioStandard)\"")
+            }
+            assertTrue(lines.contains("set_instance_assignment -name IO_STANDARD \"3.3-V LVTTL\" -to f"), "\(file): LEDR0 output is 3.3-V LVTTL")
+            let lastLocation = lines.lastIndex { $0.hasPrefix("set_location_assignment") } ?? -1
+            let firstStandard = lines.firstIndex { $0.contains("-name IO_STANDARD") } ?? -1
+            assertTrue(firstStandard > lastLocation, "\(file): IO_STANDARD lines follow the locations, as Quartus saves them")
+        }
+    }
+}
