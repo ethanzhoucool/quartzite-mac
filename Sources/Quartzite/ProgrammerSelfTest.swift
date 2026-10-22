@@ -189,7 +189,8 @@ enum ProgrammerSelfTest {
             check(fake2.calls.count == 1, "Start after Auto Detect only programs")
 
             // Device mismatch: refused before anything is sent to the board.
-            for (url, what) in [(dieURL, "a .sof for another die (5CSEMA5)"), (nanoURL, "a .sof for another part on the same die (5CSEBA6U23)")] {
+            let mismatched: [(URL, String)] = [(dieURL, "a .sof for another die (5CSEMA5)"), (nanoURL, "a .sof for another part on the same die (5CSEBA6U23)")]
+            for (url, what) in mismatched {
                 let f = FakeProgrammerRunner()
                 f.replies = ["--detect": .init(status: 0, output: detect), "--write-sram": .init(status: 0, output: success)]
                 do {
@@ -211,7 +212,8 @@ enum ProgrammerSelfTest {
             catch ProgrammerError.noHardware { check(f3.calls.filter { $0.contains("--write-sram") }.isEmpty, "no hardware: clear error, nothing programmed") }
 
             // Firmware missing or not a HEX file: nothing runs.
-            for (bad, what) in [(nil, "no firmware chosen"), (notHex, "a file that is not Intel HEX")] {
+            let badFirmware: [(URL?, String)] = [(nil, "no firmware chosen"), (notHex, "a file that is not Intel HEX")]
+            for (bad, what) in badFirmware {
                 let f = FakeProgrammerRunner()
                 var ob = o; ob.firmware = bad
                 do { _ = try ProgrammerService(options: ob, runner: f).detect(); check(false, "\(what) is refused") }

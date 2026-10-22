@@ -548,7 +548,7 @@ struct ProgrammerService: @unchecked Sendable {
             }
             if let target {
                 guard target.isFPGA, Programmer.dieByte(target.idcode) == cfg.idcode else {
-                    throw ProgrammerError.deviceMismatch(String(format: "Device mismatch: %@ is for IDCODE byte 0x%02x, but the chain device is %@ (%@)", file.lastPathComponent, cfg.idcode, target.name, target.idcodeText))
+                    throw ProgrammerError.deviceMismatch("Device mismatch: \(file.lastPathComponent) is for IDCODE byte " + String(format: "0x%02x", cfg.idcode) + ", but the chain device is \(target.name) (\(target.idcodeText))")
                 }
             }
             if out.standardizedFileURL != file.standardizedFileURL { try data.write(to: out, options: .atomic) }
