@@ -81,6 +81,44 @@ A project holds several `.bdf` files, as in Quartus:
 - **Limits.** Blocks, the 7447, VCC and GND can't be rotated or flipped yet. Only the
   top-level entity's pins get locations. A design can't use itself.
 
+## Opening Quartus projects
+
+`File > Open...` and `File > Open Project...` also take a Quartus project (`.qpf` or
+`.qsf`) or a single block diagram (`.bdf`), such as a project made on a lab computer.
+Finder's Open With menu offers Quartzite for `.qpf` and `.bdf` files too; Quartzite
+never makes itself the default app for them. The command-line equivalent is
+`Quartzite --import <file.qpf|.qsf|.bdf> <out.qzproj>`.
+
+- **What is read.** From the `.qsf`: the device, the top-level entity, every `BDF_FILE`,
+  the `set_location_assignment` pin locations and the `IO_STANDARD` lines. Quartus often
+  writes `BDF_FILE` with the lab computer's path (`//tsclient/...` or `C:\...`); each file is
+  found by its name in the `.qsf`'s folder. Each `.bdf` becomes one file of the design. A
+  block whose `.bdf` sits in the same folder but isn't listed is imported too, with a
+  message. A lone `.bdf` takes the device and pin locations of a `.qsf` beside it whose
+  top-level entity it is.
+- **Symbols.** Input and output pins, NOT, AND2-4, OR2-4, NAND2-4, NOR2-4, XOR, XNOR, VCC,
+  GND, the 7447 and blocks of the project's own `.bdf` files. Block symbols come from the
+  `.bsf` next to the `.bdf`, or from the instance in the parent sheet when there is no
+  `.bsf`. Anything else (`lpm_` megafunctions, flip-flops, buses, bidirectional pins,
+  Verilog or VHDL blocks) stops the import with a message that names the symbol and the
+  file.
+- **Connections.** Nets are rebuilt from the wire geometry and the wire and pin names, the
+  same way `ci/bdf_check.py` reads an exported `.bdf`. Ports joined by drawn lines become
+  Quartzite wires; named wires become net labels. Before the design opens, its
+  connectivity is compared with the Quartus nets, so the simulation matches Quartus.
+- **Placement.** Symbols keep their Quartus coordinates (Quartzite uses the same units).
+  A sheet with negative coordinates is moved right or down by whole grid steps.
+  Wires are redrawn by Quartzite's router, so they can take different paths.
+- **Input order.** Inputs follow the signal order of the project's waveform (`.vwf`)
+  when there is one. Otherwise they are ordered top to bottom.
+- **Saving.** The imported design opens unsaved, and the window title says where it came
+  from. `Save` asks for a `.qzproj`. `Export Quartus Project...` writes it back for
+  Quartus.
+- **Not kept.** Quartzite writes each board pin's own I/O standard on export. A different
+  `IO_STANDARD` in the `.qsf` is listed in the import messages. Lines and shapes drawn on
+  the sheet that are not wires are left out. Rotated VCC, GND, 7447 and block symbols are
+  drawn upright; their connections don't change.
+
 ## Compiler
 
 `Processing > Start Compilation` runs a real Quartus-style flow on the Mac: Analysis &
@@ -114,6 +152,11 @@ Details: `docs/ASSEMBLER_NOTES.md`, `docs/TOOLCHAIN_NOTES.md`.
   including rotated and flipped symbols, against the Quartus library;
   `python3 ci/bdf_check.py --geometry <file.bdf>...` runs only that check (useful on
   .bdf files saved by real Quartus).
+- The self-test also exports every reference design and `ci/designs` project, imports it
+  back and compares the truth table, pin locations, files and blocks. It then exports
+  the imported design and imports it again. It imports the Quartus-saved fixtures in
+  `ci/fixtures/quartus18/hier`. With `QUARTZITE_PRIVATE_LABS=<folder>`, it also imports
+  course projects kept outside the repository and reads them at run time.
 - `bash ci/sof_check.sh` runs the `.sof` checks against sample files in `../sof-samples`
   (not included; see `docs/SOF_FORMAT.md` for the public sources).
 - `ci/quartus_check.py` compiles the exports with real Quartus Lite 18.1 in GitHub Actions

@@ -287,6 +287,63 @@ was successful. 0 errors, 0 warnings", and switched to the Compilation Report ta
 - The symbol geometry rules marked provisional above.
 - Quartus' default for an unconnected block input.
 
+## Quartus project import (`QuartusImport.swift`)
+
+`File > Open` on a `.qpf`, `.qsf` or `.bdf` and `Quartzite --import <file> <out.qzproj>`.
+
+- **Settings.** The `.qsf` is split into Tcl words (quotes and braces group). The importer
+  reads `DEVICE`, `TOP_LEVEL_ENTITY`, `BDF_FILE`, `VECTOR_WAVEFORM_FILE`,
+  `set_location_assignment` and `IO_STANDARD`. A `.qpf` leads to `<PROJECT_REVISION>.qsf`.
+  Each `BDF_FILE` is resolved by its last path component (with `/` or `\` separators),
+  ignoring case, in the `.qsf`'s folder. Other design files (`VERILOG_FILE`, ...) are
+  reported, not imported.
+- **Sheets.** Each `.bdf` is parsed with `SExprParser`. `(line_width)` and `(color)` are
+  dropped first, as in `bdf_check.strip_attrs`. Pins, symbols, connectors, junctions
+  and free text are read; other drawn shapes are counted and reported. Buses (`(bus)`
+  connectors, `name[3..0]` pins) and bidirectional pins are errors.
+- **Symbols.** A symbol is classified as a primitive (`GateKind.bdfName`, VCC, GND), a
+  library macro (`MacroLibrary`), or a block (a `.bdf` of the project, or one in the
+  same folder). Anything else is an error that names the symbol, its instance and the
+  file, and says why: megafunction, sequential primitive, or unknown. Every port name
+  must exist on Quartzite's symbol with the same direction. A block's symbol is its
+  `.bsf` (or, without one, the first instance's). An instance that differs from the
+  `.bsf` keeps its own symbol and is reported as stale.
+- **Placement.** Pins and primitives are placed so that their first port lands on the
+  Quartus point. This also handles the 176-wide input pins of Quartus II 13. The
+  orientation tag is kept. Blocks and macros use the rect origin. Rotated VCC, GND,
+  blocks and macros are drawn upright, with a message. Negative coordinates shift the
+  sheet by a multiple of 8.
+- **Nets.** `QuartusImport.netlist` is a line-for-line port of
+  `bdf_check.sheet_netlist`. Ports, connector end points and junctions on the same
+  point join. A connector end point or junction on another connector's interior joins
+  it, but a port alone there does not. Pins and named connectors join by lowercased
+  name. Two partitions are kept: geometric (`geo`) and named (`nets`).
+- **Rebuild.** Within each geometric group, ports are connected by a Manhattan minimum
+  spanning tree of Quartzite wires. Ports that already coincide get no wire, since
+  Quartzite joins them anyway. Each group's connector names become net labels on its
+  ports, preferring gate ports and skipping a name equal to a pin in the group.
+  Spellings are unified case-insensitively: a pin's spelling wins, then the first
+  connector's.
+- **Verification.** `Connectivity` of the rebuilt sheet is compared with the Quartus
+  nets. Ports Quartus joins but Quartzite doesn't are wired together, with a message.
+  This covers names that join only through port-less connectors. Ports Quartzite would
+  join but Quartus keeps apart stop the import. That happens only if two ports end up
+  on the same point in Quartzite but not in Quartus.
+- **Top level.** Locations are applied to the top-level entity's pins (`CycloneV.normalize`).
+  Locations for other names are reported. An `IO_STANDARD` that differs from the board
+  pin's standard is reported, because export writes the board's standard. The input
+  order comes from the `.vwf` signal order (`VECTOR_WAVEFORM_FILE`, `<project>.vwf`,
+  `Waveform.vwf`), otherwise top to bottom.
+- **Tests** (`ImportSelfTest.swift`). Every design in `TestDesigns.all` and `ci/designs`
+  is exported, imported, compared (every truth-table row, pin locations, used sheets and
+  block instances, no stale symbols), exported again and imported again. The
+  Quartus-saved `hiertop.bdf` and `hiertest.qpf` fixtures are imported and their
+  hierarchy and nets checked. Edge cases: a `//tsclient` `BDF_FILE`, `lpm_` and `DFF`
+  errors, a missing file, negative coordinates and a lone `.bdf`.
+  `QUARTZITE_PRIVATE_LABS` enables checks on course projects outside the repository.
+  Their expected functions come from those projects' own reference `.qzproj`, never
+  from this repository.
+
 ## Known gaps
 
 - No .sof, no routing, no delays. Logic placement is logical (LAB n, ALM m), not a Quartus
