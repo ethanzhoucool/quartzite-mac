@@ -1,0 +1,10 @@
+index 0:
+	idcode   0x4ba00477
+	type     ARM cortex A9
+	irlength 4
+index 1:
+	idcode 0x2d020dd
+	manufacturer altera
+	family cyclone V Soc
+	model  5CSE*A6/5CSX*6
+	irlength 10

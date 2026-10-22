@@ -1,0 +1,5 @@
+missing FX2 firmware
+use --probe-firmware with something
+like /opt/intelFPGA/VERSION/quartus/linux64/blaster_6810.hex
+Or use -DBLASTERII_PATH=/opt/intelFPGA/VERSION/quartus/linux64
+JTAG init failed with: usbBlasterII: missing firmware

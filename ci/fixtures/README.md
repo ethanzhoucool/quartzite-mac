@@ -31,3 +31,25 @@ file it saves. Quartzite never copies that comment into its own output.
 
 Only these symbol blocks are kept; the course design they came from is not part of
 this repository.
+
+## `openfpgaloader/`
+
+Output of openFPGALoader v1.2.0 (built from source on macOS 26, Apple Silicon), used by
+`ProgrammerSelfTest` to test Quartzite's parsing. No board was attached.
+
+| File | Command |
+|---|---|
+| `version.txt` | `openFPGALoader --Version` |
+| `list_cables.txt` | `openFPGALoader --list-cables` |
+| `scan_usb_none.txt` | `openFPGALoader --scan-usb` with no probe connected |
+| `detect_blasterII_no_firmware.txt` | `openFPGALoader -c usb-blasterII --detect` (no `--probe-firmware`) |
+| `detect_blasterII_no_device.txt` | `openFPGALoader -c usb-blasterII --probe-firmware <placeholder .hex> --detect` with no board |
+| `detect_blaster_no_device.txt` | `openFPGALoader -c usb-blaster --detect` with no cable |
+
+`openfpgaloader/synthesized/` holds output that needs a board, written by hand from the
+`printf` formats in openFPGALoader's source (`src/main.cpp` for `--detect`,
+`src/progressBar.cpp` for the SRAM progress lines, `src/libusb_ll.cpp` for `--scan-usb`)
+and the DE10-Standard's chain (ARM DAP 0x4BA00477, then the 5CSXFC6 at 0x02D020DD).
+They were not captured from hardware; the manufacturer and product strings in
+`scan_usb_de_soc.txt` are what Quartus shows for the board ("DE-SoC") and are unverified.
+Replace them with captured output once a board has been tried.

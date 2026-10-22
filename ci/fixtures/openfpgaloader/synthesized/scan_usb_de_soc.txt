@@ -1,0 +1,2 @@
+Bus device vid:pid       probe_type      manufacturer serial product
+001 004    0x09fb:0x6010 usb-blasterII_1 Altera       none   DE-SoC

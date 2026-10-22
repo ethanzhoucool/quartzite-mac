@@ -1,0 +1,4 @@
+Waiting reload: [==================================================] 100.00%
+
+Fail
+JTAG init failed with: FX2: fail to open device

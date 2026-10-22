@@ -90,6 +90,7 @@ enum SelfTest {
         ImportSelfTest.run(check)
         SOFSelfTest.run(check)
         HardwareSelfTest.run(check)
+        ProgrammerSelfTest.run(check)
 
         print("Export")
         guard let bundle = try? QuartusExport.makeBundle(p, conn: conn) else { print("export failed"); return false }
