@@ -36,6 +36,27 @@ enum HierarchySelfTest {
     static func run(_ check: Check) {
         symbols(check)
         model(check)
+        sheetOps(check)
+    }
+
+    /// HA and FA (two HA blocks), top FA, symbols created.
+    static func haFA() -> DesignProject {
+        var db = TestDesigns.DesignBuilder("FA")
+        db.sheet(TestDesigns.halfAdder(db))
+        db.createSymbol("HA")
+        db.sheet(TestDesigns.fullAdder(db))
+        db.createSymbol("FA")
+        return db.d
+    }
+
+    /// The (component name, port name) at both ends of each wire on `sheet`, sorted.
+    static func wireEnds(_ d: DesignProject, _ sheet: String) -> [String] {
+        guard let s = d.sheet(named: sheet) else { return [] }
+        func end(_ r: PortRef) -> String {
+            guard let c = s.components.first(where: { $0.id == r.comp }) else { return "?" }
+            return "\(c.name).\(c.portName(r.port))"
+        }
+        return s.wires.map { [end($0.a), end($0.b)].sorted().joined(separator: "-") }.sorted()
     }
 
     // MARK: - Symbols (plan 1.2)
@@ -142,5 +163,73 @@ enum HierarchySelfTest {
         check(legacy.symbol == nil && legacy.id == nil
               && !(String(data: (try? JSONEncoder().encode(legacy)) ?? Data(), encoding: .utf8) ?? "").contains("\"symbol\""),
               "a single-sheet project without a symbol still saves without the new keys")
+    }
+
+    // MARK: - Sheet operations (plan 1.4)
+
+    static func sheetOps(_ check: Check) {
+        print("Sheet operations")
+        let d = haFA()
+        check(d.structuralErrors.isEmpty && d.staleInstances().isEmpty, "HA + FA design is well formed and up to date")
+        check(d.usedSheets() == ["FA", "HA"] && d.instanceTree().children.map(\.label) == ["HA:inst", "HA:inst1"],
+              "FA uses HA twice (got \(d.usedSheets()), \(d.instanceTree().children.map(\.label)))")
+        check(d.instanceTree().totalGates == 5, "FA has 5 gates in total (got \(d.instanceTree().totalGates))")
+
+        var r = d
+        let haID = r.sheet(named: "HA")!.id!
+        check((try? r.renameSheet(id: haID, to: "fa")) == nil, "renaming HA to fa (another sheet's name, any case) is refused")
+        check((try? r.renameSheet(id: haID, to: "and")) == nil, "renaming HA to a reserved word is refused")
+        check((try? r.renameSheet(id: haID, to: "2HA")) == nil, "renaming HA to an invalid name is refused")
+        check((try? r.renameSheet(id: haID, to: "HALF")) != nil, "HA can be renamed to HALF")
+        let fa = r.sheet(named: "FA")
+        check(r.sheet(named: "HA") == nil && r.sheet(named: "HALF")?.symbol?.name == "HALF"
+              && fa?.components.filter { $0.kind == .block }.allSatisfy { $0.symbol?.name == "HALF" && $0.symbol?.nameText.text == "HALF" } == true
+              && r.staleInstances().isEmpty && r.usedSheets() == ["FA", "HALF"] && r.structuralErrors.isEmpty,
+              "after renaming HA to HALF, FA's blocks are HALF blocks and nothing is stale")
+        check(wireEnds(r, "FA") == wireEnds(d, "FA"), "renaming keeps FA's wires")
+
+        var top = d
+        let faID = top.sheet(named: "FA")!.id!
+        check((try? top.renameSheet(id: faID, to: "Adder")) != nil && top.topLevelEntity == "Adder" && top.name == "Adder",
+              "renaming the top sheet renames the top-level entity and the design")
+        check((try? top.removeSheet(id: haID)) == nil, "a sheet used as a block can't be removed")
+        check((try? top.removeSheet(id: faID)) == nil, "the top-level sheet can't be removed")
+        let spare = try? top.addSheet(named: "Spare")
+        check(spare != nil && top.usedSheets() == ["Adder", "HA"], "an added sheet that is not instantiated is not used")
+        check((try? top.removeSheet(id: spare!)) != nil && top.sheets.count == 2, "an unused sheet can be removed")
+        check((try? top.addSheet(named: "ha")) == nil, "adding a sheet whose name clashes in case is refused")
+
+        var rec = d
+        check(rec.wouldRecurse(placing: "FA", into: "HA") && rec.wouldRecurse(placing: "HA", into: "HA")
+              && !rec.wouldRecurse(placing: "HA", into: "FA"), "wouldRecurse finds direct and indirect recursion")
+        check((try? rec.placeBlock("FA", inSheet: haID, x: 600, y: 40)) == nil && rec.sheet(named: "HA")?.components.count == 6,
+              "inserting FA into HA is refused")
+        let noSym = try? rec.addSheet(named: "Bare")
+        check((try? rec.placeBlock("Bare", inSheet: faID, x: 600, y: 400)) == nil, "a sheet without a symbol can't be placed")
+        rec.sheets.removeAll { $0.id == noSym }
+
+        var grow = d
+        let hi = grow.sheetIndex(named: "HA")!
+        grow.sheets[hi].components.append(Component(kind: .input, name: "cin2", x: 32, y: 160))
+        let rep = grow.createSymbol(forSheet: haID)
+        let ha = grow.sheet(named: "HA")!.symbol!
+        check(ha.ports.count == 5 && ha.inputs.map(\.name) == ["a", "b", "cin2"], "adding pin cin2 to HA adds a port to its symbol")
+        check(rep.updatedInstances == 2 && rep.addedPorts == ["cin2"] && rep.removedPorts.isEmpty && rep.droppedWires == 0
+              && rep.droppedLabels.isEmpty, "createSymbol updates both instances and reports the new port (\(rep.summary))")
+        check(wireEnds(grow, "FA") == wireEnds(d, "FA") && grow.sheet(named: "FA")?.labels.count == d.sheet(named: "FA")?.labels.count,
+              "after adding cin2, FA keeps every wire and node name on the same ports")
+        check(grow.staleInstances().isEmpty, "no instance is stale after createSymbol")
+
+        var shrink = d
+        let si = shrink.sheetIndex(named: "HA")!
+        let cPin = shrink.sheets[si].components.first { $0.name == "c" }!.id
+        shrink.sheets[si].components.removeAll { $0.id == cPin }
+        shrink.sheets[si].wires.removeAll { $0.a.comp == cPin || $0.b.comp == cPin }
+        let rep2 = shrink.createSymbol(forSheet: haID)
+        let before = wireEnds(d, "FA"), after = wireEnds(shrink, "FA")
+        check(rep2.removedPorts == ["c"] && rep2.droppedWires == 1 && rep2.droppedLabels == ["c1"],
+              "removing pin c reports the removed port, one wire and the node name c1 (\(rep2.summary))")
+        check(after.count == before.count - 1 && Set(before).subtracting(after) == ["inst1.c-inst2.IN2"],
+              "removing pin c drops exactly its wire (dropped \(Set(before).subtracting(after).sorted()))")
     }
 }

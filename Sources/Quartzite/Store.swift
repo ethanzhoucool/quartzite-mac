@@ -57,7 +57,14 @@ enum PropertySheet: Identifiable {
 
 @MainActor @Observable
 final class Store {
-    var project = Project() { didSet { projectChanged() } }
+    /// The whole project: every .bdf sheet, the top-level entity and the device.
+    var design = DesignProject(single: Project()) { didSet { designChanged() } }
+    /// The sheet shown in the Block Editor.
+    var activeSheetID = UUID() { didSet { if activeSheetID != oldValue { refreshRouting() } } }
+    /// Sheets with an open .bdf tab, in tab order.
+    var openSheetIDs: [UUID] = []
+    /// Blocks the user descended into (Hierarchy Up returns along it).
+    var hierarchyTrail: [(sheet: UUID, instance: UUID)] = []
     var fileURL: URL?
     var dirty = false
     var selection: Set<Selection> = []
@@ -106,8 +113,8 @@ final class Store {
     var liveStage: UUID?
     var liveStart = 0
     private(set) var routing: Routing
-    private var undoStack: [Project] = []
-    private var redoStack: [Project] = []
+    private var undoStack: [(design: DesignProject, sheet: UUID)] = []
+    private var redoStack: [(design: DesignProject, sheet: UUID)] = []
     private var suppressChange = false
     private let persist: Bool
 
@@ -115,13 +122,17 @@ final class Store {
         self.persist = persist
         let p = Project()
         routing = Routing(project: p, conn: Connectivity(p))
+        activeSheetID = design.sheets[0].id!
+        openSheetIDs = [activeSheetID]
         if persist {
             toolchainSearch = Toolchain.shared
             useHardwareFlow = UserDefaults.standard.object(forKey: Store.hardwareFlowKey) as? Bool ?? true
         }
         if persist, let restored = Store.loadAutosave() {
             suppressChange = true
-            project = restored.project
+            design = restored.design
+            activeSheetID = restored.activeSheet
+            openSheetIDs = [activeSheetID]
             fileURL = restored.url
             dirty = restored.dirty ?? true
             suppressChange = false
@@ -132,7 +143,38 @@ final class Store {
         }
     }
 
-    var title: String { fileURL?.deletingPathExtension().lastPathComponent ?? project.name }
+    var title: String { fileURL?.deletingPathExtension().lastPathComponent ?? design.name }
+
+    // MARK: - Sheets
+
+    private var activeIndex: Int { design.sheetIndex(id: activeSheetID) ?? design.topIndex ?? 0 }
+    private var topIndex: Int { design.topIndex ?? activeIndex }
+
+    /// The sheet open in the Block Editor. Setting a sheet with another entity name renames
+    /// it (with its symbol and block instances); a one-sheet design also takes the sheet's
+    /// name as its project name, top-level entity and device.
+    var project: Project {
+        get { design.sheets[activeIndex] }
+        set { design = Store.replacingSheet(activeIndex, with: newValue, in: design) }
+    }
+
+    /// The top-level entity's sheet: its pins are the design's pins.
+    var topProject: Project { design.top ?? project }
+
+    static func replacingSheet(_ i: Int, with p: Project, in design: DesignProject) -> DesignProject {
+        var d = design
+        let old = d.sheets[i]
+        var p = p
+        p.id = old.id
+        d.sheets[i] = p
+        if p.entityName != old.entityName { d.renameReferences(from: old.entityName, sheet: i) }
+        if d.sheets.count == 1 {
+            d.name = p.name
+            d.topLevelEntity = p.entityName
+            d.device = p.device
+        }
+        return d
+    }
 
     var canvasSize: CGSize {
         let frames = project.components.map { $0.frame } + (project.notes ?? []).map { $0.frame }
@@ -150,7 +192,7 @@ final class Store {
     }
 
     var pinState: TaskState {
-        let pins = project.inputPins + project.outputPins
+        let pins = topProject.inputPins + topProject.outputPins
         if pins.isEmpty { return .notRun }
         return pins.allSatisfy { !($0.location ?? "").isEmpty } ? .ok : .warning
     }
@@ -166,7 +208,7 @@ final class Store {
 
     // MARK: - Mutation & undo
 
-    private func projectChanged() {
+    private func designChanged() {
         guard !suppressChange else { return }
         dirty = true
         if isProcessing { resetFlow() }
@@ -182,7 +224,7 @@ final class Store {
     func refreshRouting() { routing = Routing(project: project, conn: Connectivity(project)) }
 
     func checkpoint() {
-        undoStack.append(project)
+        undoStack.append((design, activeSheetID))
         if undoStack.count > 200 { undoStack.removeFirst() }
         redoStack.removeAll()
     }
@@ -192,6 +234,23 @@ final class Store {
         var p = project
         change(&p)
         project = p
+    }
+
+    /// An undoable change to the whole design (sheets, top-level entity, device).
+    func mutateDesign(_ change: (inout DesignProject) -> Void) {
+        checkpoint()
+        var d = design
+        change(&d)
+        if d.sheetIndex(id: activeSheetID) == nil, let id = (d.top ?? d.sheets.first)?.id { activeSheetID = id }
+        openSheetIDs = openSheetIDs.filter { d.sheetIndex(id: $0) != nil }
+        if !openSheetIDs.contains(activeSheetID) { openSheetIDs.append(activeSheetID) }
+        design = d
+    }
+
+    /// An undoable change to the top-level sheet (pin locations, input order).
+    func mutateTop(_ change: (inout Project) -> Void) {
+        let i = topIndex
+        mutateDesign { change(&$0.sheets[i]) }
     }
 
     /// Live edits during a drag; call `checkpoint()` once before the drag starts.
@@ -206,15 +265,21 @@ final class Store {
 
     func undo() {
         guard let prev = undoStack.popLast() else { return }
-        redoStack.append(project)
-        project = prev
-        pruneSelection()
+        redoStack.append((design, activeSheetID))
+        restore(prev)
     }
 
     func redo() {
         guard let next = redoStack.popLast() else { return }
-        undoStack.append(project)
-        project = next
+        undoStack.append((design, activeSheetID))
+        restore(next)
+    }
+
+    private func restore(_ state: (design: DesignProject, sheet: UUID)) {
+        activeSheetID = state.design.sheetIndex(id: state.sheet) != nil ? state.sheet : (state.design.top?.id ?? state.design.sheets[0].id!)
+        openSheetIDs = openSheetIDs.filter { state.design.sheetIndex(id: $0) != nil }
+        if !openSheetIDs.contains(activeSheetID) { openSheetIDs.append(activeSheetID) }
+        design = state.design
         pruneSelection()
     }
 
@@ -273,18 +338,18 @@ final class Store {
     }
 
     func moveInput(_ id: UUID, by delta: Int) {
-        var order = project.inputPins.map { $0.id }
+        var order = topProject.inputPins.map { $0.id }
         guard let i = order.firstIndex(of: id) else { return }
         let j = i + delta
         guard j >= 0, j < order.count else { return }
         order.swapAt(i, j)
-        mutate { $0.inputOrder = order }
+        mutateTop { $0.inputOrder = order }
     }
 
     /// Lab defaults: inputs MSB to LSB on SW(n-1)...SW0, outputs on LEDR0, LEDR1...
     func autoAssignPins() {
-        let ins = project.inputPins, outs = project.outputPins
-        mutate { p in
+        let ins = topProject.inputPins, outs = topProject.outputPins
+        mutateTop { p in
             for (k, pin) in ins.enumerated() {
                 let sw = ins.count - 1 - k
                 if sw < 10, let i = p.index(of: pin.id) { p.components[i].location = BoardPin.de10Standard[sw].pin }
@@ -297,10 +362,10 @@ final class Store {
     }
 
     func assign(_ pinID: UUID, to location: String?) {
-        guard project.component(pinID)?.kind.isPin == true else { return }
+        guard topProject.component(pinID)?.kind.isPin == true else { return }
         let normalized = location?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         let loc = normalized?.isEmpty == false ? normalized : nil
-        mutate { p in
+        mutateTop { p in
             // A board resource can only belong to one node, regardless of spelling.
             if let loc {
                 for i in p.components.indices where p.components[i].location?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() == loc
@@ -424,7 +489,7 @@ final class Store {
 
     func setExpected(_ output: UUID, _ text: String) {
         suppressChange = true
-        project.expected[output.uuidString] = text
+        design.sheets[topIndex].expected[output.uuidString] = text
         suppressChange = false
         dirty = true
         if let s = simulation, let i = s.outputIDs.firstIndex(of: output) {
@@ -439,7 +504,7 @@ final class Store {
     /// Output values for the board preview's current switch positions.
     func boardOutputs() -> [UUID: Bool]? {
         // Pure read: never mutates state, so it is safe to call while views render.
-        guard let c = (compileIsStale ? nil : compiled) ?? Compiler.compile(project).0 else { return nil }
+        guard let c = (compileIsStale ? nil : compiled) ?? Compiler.compile(topProject).0 else { return nil }
         // Push buttons are active low: they read 0 while pressed.
         let bits = c.inputs.map { pin -> Bool in
             let v = boardInputs[pin.id] ?? false
@@ -454,11 +519,17 @@ final class Store {
     static let projectType = UTType(exportedAs: "com.quartzite.project", conformingTo: .json)
 
     /// Replace a document without autosaving a new project under the previous URL.
-    func loadProject(_ p: Project, from url: URL?, dirty: Bool) {
+    func loadDesign(_ d: DesignProject, from url: URL?, dirty: Bool, activeSheet: UUID? = nil) {
         resetFlow()
         projectVersion += 1
         suppressChange = true
-        project = p
+        var d = d
+        for i in d.sheets.indices where d.sheets[i].id == nil { d.sheets[i].id = UUID() }
+        if d.sheets.isEmpty { d = DesignProject(single: Project()) }
+        design = d
+        activeSheetID = activeSheet.flatMap { d.sheetIndex(id: $0) != nil ? $0 : nil } ?? (d.top ?? d.sheets[0]).id!
+        openSheetIDs = [activeSheetID]
+        hierarchyTrail = []
         fileURL = url
         self.dirty = dirty
         suppressChange = false
@@ -476,6 +547,11 @@ final class Store {
         EditorState.shared.cursor = nil
         refreshRouting()
         autosave()
+    }
+
+    /// A one-sheet project (a version 1 file).
+    func loadProject(_ p: Project, from url: URL?, dirty: Bool) {
+        loadDesign(DesignProject(single: p), from: url, dirty: dirty)
     }
 
     func newProject(name: String, device: String, starterPins: Bool) {
@@ -496,8 +572,7 @@ final class Store {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             let data = try Data(contentsOf: url)
-            let p = try JSONDecoder().decode(Project.self, from: data)
-            loadProject(p, from: url, dirty: false)
+            loadDesign(try DesignProject.load(data), from: url, dirty: false)
             systemMessages.append(Message(level: .info, text: "Opened \(url.lastPathComponent)"))
             autosave()
         } catch {
@@ -512,16 +587,14 @@ final class Store {
     func saveAs() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [Store.projectType]
-        panel.nameFieldStringValue = project.entityName + ".qzproj"
+        panel.nameFieldStringValue = design.projectName + ".qzproj"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         write(to: url)
     }
 
     /// Commit document state only after the file was successfully written.
     func saveProject(to url: URL) throws {
-        let enc = JSONEncoder()
-        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try enc.encode(project).write(to: url, options: .atomic)
+        try design.encoded().write(to: url, options: .atomic)
         fileURL = url
         dirty = false
         autosave()
@@ -534,6 +607,7 @@ final class Store {
     }
 
     func exportQuartusProject() {
+        let project = topProject
         guard Compiler.compile(project, checkLocations: false).0 != nil else {
             compile()
             tab = .bdf
@@ -563,6 +637,7 @@ final class Store {
     @discardableResult
     func exportBundle(into folder: URL, reveal: Bool) -> Bool {
         do {
+            let project = topProject
             let bundle = try QuartusExport.makeBundle(project, conn: Connectivity(project))
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             var files = bundle.files
@@ -591,7 +666,7 @@ final class Store {
               let text = try? String(contentsOf: url, encoding: .utf8) else { return }
         let regex = try! NSRegularExpression(pattern: "set_location_assignment\\s+(PIN_\\w+)\\s+-to\\s+\"?([A-Za-z_][\\w\\[\\]]*)\"?")
         var count = 0
-        mutate { p in
+        mutateTop { p in
             for m in regex.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
                 guard let lr = Range(m.range(at: 1), in: text), let nr = Range(m.range(at: 2), in: text) else { continue }
                 let loc = String(text[lr]).uppercased(), name = String(text[nr])
@@ -630,7 +705,7 @@ final class Store {
         guard dirty else { return true }
         let a = NSAlert()
         a.messageText = "Replace the current project?"
-        a.informativeText = "Unsaved changes to \(project.entityName) will be lost. Save first with File > Save if you want to keep them."
+        a.informativeText = "Unsaved changes to \(design.projectName) will be lost. Save first with File > Save if you want to keep them."
         a.addButton(withTitle: "Replace")
         a.addButton(withTitle: "Cancel")
         return a.runModal() == .alertFirstButtonReturn
@@ -657,19 +732,30 @@ final class Store {
 
     private static var autosaveURL: URL { supportDirectory.appendingPathComponent("autosave.json") }
 
-    private struct Autosave: Codable { var project: Project; var url: URL?; var dirty: Bool? = nil }
+    /// Sessions saved before multi-sheet designs have `project` instead of `design`.
+    private struct Autosave: Codable {
+        var design: DesignProject?
+        var project: Project?
+        var url: URL?
+        var dirty: Bool? = nil
+        var activeSheet: UUID?
+    }
 
     private func autosave() {
         guard persist else { return }
-        if let data = try? JSONEncoder().encode(Autosave(project: project, url: fileURL, dirty: dirty)) {
+        if let data = try? JSONEncoder().encode(Autosave(design: design, url: fileURL, dirty: dirty, activeSheet: activeSheetID)) {
             try? data.write(to: Store.autosaveURL, options: .atomic)
         }
     }
 
-    private static func loadAutosave() -> Autosave? {
+    private static func loadAutosave() -> (design: DesignProject, activeSheet: UUID, url: URL?, dirty: Bool?)? {
         guard let data = try? Data(contentsOf: autosaveURL),
-              let a = try? JSONDecoder().decode(Autosave.self, from: data) else { return nil }
-        return a
+              let a = try? JSONDecoder().decode(Autosave.self, from: data),
+              var d = a.design ?? a.project.map({ DesignProject(single: $0) }), !d.sheets.isEmpty else { return nil }
+        for i in d.sheets.indices where d.sheets[i].id == nil { d.sheets[i].id = UUID() }
+        guard d.structuralErrors.isEmpty || a.design == nil else { return nil }
+        let active = a.activeSheet.flatMap { d.sheetIndex(id: $0) != nil ? $0 : nil } ?? (d.top ?? d.sheets[0]).id!
+        return (d, active, a.url, a.dirty)
     }
 }
 

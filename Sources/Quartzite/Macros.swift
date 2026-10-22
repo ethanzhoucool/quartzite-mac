@@ -50,3 +50,41 @@ enum BuiltinSymbols {
     static let vccPrimitive = vcc.primitive
     static let gndPrimitive = gnd.primitive
 }
+
+// MARK: - Library macros
+
+/// A Quartus library macro (a "maxplus2" TTL part). Quartzite places it with Quartus'
+/// own symbol text and models its function as a truth table.
+struct MacroDef {
+    enum UnconnectedInputs { case error }
+
+    var name: String
+    /// Folder in the Symbol dialog, e.g. ["others", "maxplus2"].
+    var library: [String]
+    /// The (symbol ...) exactly as Quartus writes it into a .bdf.
+    var symbolText: String
+    var inputs: [String]
+    var outputs: [String]
+    var unconnectedInputs: UnconnectedInputs = .error
+    /// Advice shown with the "input not connected" error.
+    var unconnectedHint: String
+    /// Output values (in `outputs` order) for input values (in `inputs` order).
+    var function: ([Bool]) -> [Bool]
+    var description: String
+}
+
+enum MacroLibrary {
+    static let all: [MacroDef] = []
+
+    static func named(_ n: String) -> MacroDef? { all.first { $0.name.caseInsensitiveCompare(n) == .orderedSame } }
+
+    private static let symbols: [String: SymbolDef] = Dictionary(uniqueKeysWithValues: all.map { m in
+        (m.name.lowercased(), try! SymbolDef(parsing: m.symbolText, source: .library, libraryPath: m.library))
+    })
+
+    /// The macro's symbol, parsed once.
+    static func symbol(_ m: MacroDef) -> SymbolDef { symbols[m.name.lowercased()]! }
+
+    /// Gates that model the macro (see `MacroSynth`), built once.
+    static func netlist(_ m: MacroDef) -> Project { Project() }
+}

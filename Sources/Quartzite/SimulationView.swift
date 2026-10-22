@@ -77,22 +77,22 @@ struct SimulationView: View {
             .fixedSize()
             .disabled(!groupInputs)
             Divider().frame(height: 18)
-            if store.project.inputPins.count <= SimulationResult.maxInputs {
-                Text("End time: \(QuartusExport.fmt(QuartusExport.vwfTiming(store.project.inputPins.count).end)) ns")
+            if store.topProject.inputPins.count <= SimulationResult.maxInputs {
+                Text("End time: \(QuartusExport.fmt(QuartusExport.vwfTiming(store.topProject.inputPins.count).end)) ns")
                     .font(.callout).foregroundStyle(.secondary)
-                    .help("Each input combination lasts \(QuartusExport.fmt(QuartusExport.vwfTiming(store.project.inputPins.count).step)) ns, the same vectors as the exported Waveform.vwf (Count Value)")
+                    .help("Each input combination lasts \(QuartusExport.fmt(QuartusExport.vwfTiming(store.topProject.inputPins.count).step)) ns, the same vectors as the exported Waveform.vwf (Count Value)")
             } else {
                 Text("Waveforms support up to \(SimulationResult.maxInputs) inputs").font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
             if let sim = store.simulation {
                 Button("Save Image...") {
-                    store.exportPNG("\(store.project.entityName)_waveform.png",
-                                    WaveformSnapshot(sim: sim, project: store.project.entityName, groupInputs: groupInputs, radix: radix))
+                    store.exportPNG("\(store.topProject.entityName)_waveform.png",
+                                    WaveformSnapshot(sim: sim, project: store.topProject.entityName, groupInputs: groupInputs, radix: radix))
                 }
             }
             Button("Export .vwf...") {
-                do { store.exportText("Waveform.vwf", try QuartusExport.vwf(store.project)) }
+                do { store.exportText("Waveform.vwf", try QuartusExport.vwf(store.topProject)) }
                 catch { store.alert("Waveform export failed", error.localizedDescription) }
             }
                 .help("Test vectors for Quartus. Open in the lab and run Simulation > Run Functional Simulation.")
@@ -109,13 +109,13 @@ struct SimulationView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Input order (MSB to LSB)").font(.caption).foregroundStyle(.secondary)
                     FlowLayout(spacing: 6) {
-                        ForEach(Array(store.project.inputPins.enumerated()), id: \.element.id) { idx, pin in
+                        ForEach(Array(store.topProject.inputPins.enumerated()), id: \.element.id) { idx, pin in
                             HStack(spacing: 2) {
                                 Button { store.moveInput(pin.id, by: -1) } label: { Image(systemName: "chevron.left") }
                                     .disabled(idx == 0)
                                 Text(pin.name).fontWeight(.semibold).monospaced().padding(.horizontal, 3)
                                 Button { store.moveInput(pin.id, by: 1) } label: { Image(systemName: "chevron.right") }
-                                    .disabled(idx == store.project.inputPins.count - 1)
+                                    .disabled(idx == store.topProject.inputPins.count - 1)
                             }
                             .buttonStyle(.borderless)
                             .padding(.horizontal, 6).padding(.vertical, 3)
@@ -123,11 +123,11 @@ struct SimulationView: View {
                         }
                     }
                 }
-                if !store.project.outputPins.isEmpty {
+                if !store.topProject.outputPins.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Expected minterms (optional)").font(.caption).foregroundStyle(.secondary)
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 340), spacing: 24, alignment: .leading)], alignment: .leading, spacing: 6) {
-                            ForEach(store.project.outputPins) { expectedField($0) }
+                            ForEach(store.topProject.outputPins) { expectedField($0) }
                         }
                     }
                 }
@@ -143,7 +143,7 @@ struct SimulationView: View {
         HStack(spacing: 6) {
             Text("\(out.name) = Σm(").monospaced()
             TextField("e.g. 0, 4, 9", text: Binding(
-                get: { store.project.expected[out.id.uuidString] ?? "" },
+                get: { store.topProject.expected[out.id.uuidString] ?? "" },
                 set: { store.setExpected(out.id, $0) }))
                 .textFieldStyle(.roundedBorder)
                 .monospaced()

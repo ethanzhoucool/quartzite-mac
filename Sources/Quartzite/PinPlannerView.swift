@@ -7,12 +7,12 @@ struct PinPlannerView: View {
     @State private var selectedPin: UUID?
 
     var body: some View {
-        let pins = store.project.inputPins + store.project.outputPins
+        let pins = store.topProject.inputPins + store.topProject.outputPins
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Pin Planner").font(.title3.weight(.semibold))
-                    Text("\(store.project.device), DE10-Standard. Select a node, then click a switch, push button, LED or 7-segment display segment.")
+                    Text("\(store.topProject.device), DE10-Standard. Select a node, then click a switch, push button, LED or 7-segment display segment.")
                         .font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -20,7 +20,7 @@ struct PinPlannerView: View {
                     .help("Inputs in order (MSB first) go to SW(n-1) to SW0, outputs to LEDR0, LEDR1, ...")
                 Button("Import Assignments...") { store.importAssignments() }
                 Button("Export Assignments...") {
-                    store.exportText("\(store.project.entityName)_pins.qsf", QuartusExport.pinAssignments(store.project))
+                    store.exportText("\(store.topProject.entityName)_pins.qsf", QuartusExport.pinAssignments(store.topProject))
                 }
             }
             .padding(16)
@@ -32,7 +32,7 @@ struct PinPlannerView: View {
                 ContentUnavailableView {
                     Label("No pins yet", systemImage: "pin.slash")
                 } description: {
-                    Text("Insert input and output pins in \(store.project.entityName).bdf, or add the starter pins.")
+                    Text("Insert input and output pins in \(store.topProject.entityName).bdf, or add the starter pins.")
                 } actions: {
                     Button("Add Starter Pins") { store.insertStarterPins() }
                 }
@@ -100,7 +100,7 @@ struct AssignmentEditorView: View {
     @State private var filterOn = true
 
     private var pins: [Component] {
-        let all = store.project.inputPins + store.project.outputPins
+        let all = store.topProject.inputPins + store.topProject.outputPins
         guard filterOn, !filter.isEmpty, filter != "*" else { return all }
         let pattern = filter.lowercased()
         return all.filter { p in
@@ -128,7 +128,7 @@ struct AssignmentEditorView: View {
                 Toggle("Filter on node names:", isOn: $filterOn).toggleStyle(.checkbox)
                 TextField("*", text: $filter).textFieldStyle(.roundedBorder).frame(width: 240).disabled(!filterOn)
                 Spacer()
-                Text("Location assignments are written to \(store.project.entityName).qsf on export").font(.caption).foregroundStyle(.secondary)
+                Text("Location assignments are written to \(store.topProject.entityName).qsf on export").font(.caption).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 10)
             .frame(height: 32)
@@ -223,7 +223,7 @@ struct BoardView: View {
     var mode: Mode
     var selectedPin: Binding<UUID?> = .constant(nil)
 
-    private var pins: [Component] { store.project.inputPins + store.project.outputPins }
+    private var pins: [Component] { store.topProject.inputPins + store.topProject.outputPins }
 
     var body: some View {
         let outputs = mode == .play ? store.boardOutputs() : nil
@@ -268,7 +268,7 @@ struct BoardView: View {
     private func tapped(_ r: BoardPin) {
         switch mode {
         case .assign:
-            if let sel = selectedPin.wrappedValue, let pin = store.project.component(sel), (pin.kind == .input) == r.isInput {
+            if let sel = selectedPin.wrappedValue, let pin = store.topProject.component(sel), (pin.kind == .input) == r.isInput {
                 store.assign(sel, to: owner(r.pin)?.id == sel ? nil : r.pin)
             } else if let o = owner(r.pin) {
                 selectedPin.wrappedValue = o.id

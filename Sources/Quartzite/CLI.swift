@@ -89,6 +89,13 @@ enum CLI {
     }
 
     /// Returns the process exit code.
+    /// The top-level sheet of a .qzproj (format 1 or 2), as the app saves it.
+    static func loadTop(_ file: String) throws -> Project {
+        let d = try DesignProject.load(Data(contentsOf: URL(fileURLWithPath: file)))
+        guard let top = d.top else { throw DesignProject.LoadError(message: "\(file): no top-level sheet") }
+        return top
+    }
+
     static func run(_ args: [String]) -> Int32 {
         setvbuf(stdout, nil, _IOLBF, 0)   // line-buffered so progress shows up in CI logs and pipes
         func value(after flag: String) -> String? {
@@ -101,19 +108,19 @@ enum CLI {
                 return 0
             }
             if let file = value(after: "--export-project"), let i = args.firstIndex(of: "--export-project"), i + 2 < args.count {
-                let p = try JSONDecoder().decode(Project.self, from: Data(contentsOf: URL(fileURLWithPath: file)))
+                let p = try loadTop(file)
                 let folder = args[i + 2]
                 try TestDesigns.exportSuite(to: URL(fileURLWithPath: folder, isDirectory: true), designs: [(p.entityName, p)])
                 return 0
             }
             #if canImport(SwiftUI)
             if let file = value(after: "--render-project"), let i = args.firstIndex(of: "--render-project"), i + 2 < args.count {
-                let p = try JSONDecoder().decode(Project.self, from: Data(contentsOf: URL(fileURLWithPath: file)))
+                let p = try loadTop(file)
                 let dir = URL(fileURLWithPath: args[i + 2], isDirectory: true)
                 return MainActor.assumeIsolated { SelfTest.renderProject(p, to: dir) } ? 0 : 1
             }
             if let file = value(after: "--snapshot-window"), let i = args.firstIndex(of: "--snapshot-window"), i + 2 < args.count {
-                let p = try JSONDecoder().decode(Project.self, from: Data(contentsOf: URL(fileURLWithPath: file)))
+                let p = try loadTop(file)
                 let dir = URL(fileURLWithPath: args[i + 2], isDirectory: true)
                 if args.contains("--hardware") { return MainActor.assumeIsolated { WindowSnapshot.runHardware(p, to: dir) } ? 0 : 1 }
                 return MainActor.assumeIsolated { WindowSnapshot.run(p, to: dir) } ? 0 : 1
@@ -122,7 +129,7 @@ enum CLI {
             if let file = value(after: "--compile") {
                 // Quartzite --compile <file.qzproj> [--report] [--sof <out.sof> [--layout 14|16|17] [--work <dir>] [--seed n]]
                 _ = try layoutOption(args)
-                let p = try JSONDecoder().decode(Project.self, from: Data(contentsOf: URL(fileURLWithPath: file)))
+                let p = try loadTop(file)
                 guard let sofPath = value(after: "--sof") else {
                     let state = CompileFlow.run(p)
                     for m in state.messages { m.reportLines().forEach { print($0) } }

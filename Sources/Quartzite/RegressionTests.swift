@@ -195,6 +195,8 @@ extension RegressionTests {
         testPinAssignmentTreatsLocationsCaseInsensitively()
         testAutosaveAndFailedSave()
         testCompileCancellationAcrossDocuments()
+        testMultiSheetStore()
+        testLegacyAutosaveRestores()
         return failures == 0
     }
     @MainActor
@@ -307,6 +309,78 @@ extension RegressionTests {
         for _ in 0..<10 { RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
         assertEqual(store.flow?.project.entityName, "Tricky", "An obsolete compilation cannot overwrite the replacement document's results")
         assertEqual(store.tab, .bdf, "An obsolete task cannot switch the new document to its report")
+    }
+
+    @MainActor
+    static func testMultiSheetStore() {
+        let store = Store(persist: false)
+        store.project = TestDesigns.exampleSOP()
+        assertEqual(store.design.topLevelEntity, "Example", "Setting the only sheet sets the top-level entity")
+        assertEqual(store.design.name, "Example", "Setting the only sheet sets the project name")
+        let d = HierarchySelfTest.haFA()
+        store.loadDesign(d, from: nil, dirty: false)
+        assertEqual(store.project.entityName, "FA", "A loaded design opens its top-level sheet")
+        assertEqual(store.topProject.entityName, "FA")
+        store.activeSheetID = store.design.sheet(named: "HA")!.id!
+        assertEqual(store.project.entityName, "HA", "The Block Editor shows the active sheet")
+        assertEqual(store.topProject.entityName, "FA", "The top sheet does not follow the active sheet")
+        let before = store.project.components.count
+        store.mutate { $0.components.append(Component(kind: .input, name: "extra", x: 32, y: 400)) }
+        assertEqual(store.project.components.count, before + 1, "mutate edits the active sheet")
+        assertEqual(store.design.sheet(named: "FA")?.components.count, d.sheet(named: "FA")?.components.count, "mutate leaves other sheets alone")
+        store.mutate { $0.name = "HALF" }
+        assertEqual(store.design.sheet(named: "HALF")?.id, d.sheet(named: "HA")?.id, "Renaming the active sheet keeps its id")
+        assertTrue(store.design.sheet(named: "FA")!.components.filter { $0.kind == .block }.allSatisfy { $0.symbol?.name == "HALF" },
+                   "Renaming the active sheet renames its block instances")
+        assertEqual(store.design.topLevelEntity, "FA", "Renaming another sheet keeps the top-level entity")
+        let x = store.topProject.inputPins[0]
+        store.assign(x.id, to: "pin_ab30")
+        assertEqual(store.design.sheet(named: "FA")?.component(x.id)?.location, "PIN_AB30", "Pin assignments go to the top sheet")
+        store.undo()
+        assertNil(store.design.sheet(named: "FA")?.component(x.id)?.location, "Undo reverts a top-sheet assignment")
+        store.undo()
+        assertEqual(store.project.entityName, "HA", "Undo reverts the rename")
+        store.activeSheetID = store.design.sheet(named: "FA")!.id!
+        store.undo()
+        assertEqual(store.project.entityName, "HA", "Undo returns to the sheet that was edited")
+        assertEqual(store.project.components.count, before, "Undo reverts the edit on that sheet")
+        store.redo()
+        assertEqual(store.design.sheet(named: "HA")?.components.count, before + 1, "Redo repeats it")
+        store.mutateDesign { _ = try? $0.addSheet(named: "Spare") }
+        assertEqual(store.design.sheets.count, 3, "mutateDesign adds a sheet")
+        store.undo()
+        assertEqual(store.design.sheets.count, 2, "Undo removes it again")
+    }
+
+    @MainActor
+    static func testLegacyAutosaveRestores() {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appendingPathComponent("quartzite-autosave-\(UUID().uuidString)", isDirectory: true)
+        let oldSupport = ProcessInfo.processInfo.environment["QUARTZITE_SUPPORT_DIR"]
+        setenv("QUARTZITE_SUPPORT_DIR", dir.path, 1)
+        defer {
+            if let oldSupport { setenv("QUARTZITE_SUPPORT_DIR", oldSupport, 1) }
+            else { unsetenv("QUARTZITE_SUPPORT_DIR") }
+            try? fm.removeItem(at: dir)
+        }
+        struct LegacyAutosave: Codable { var project: Project; var url: URL?; var dirty: Bool? }
+        let url = URL(fileURLWithPath: "/tmp/legacy/Example.qzproj")
+        let legacy = LegacyAutosave(project: TestDesigns.exampleSOP(), url: url, dirty: false)
+        assertNoThrow(try JSONEncoder().encode(legacy).write(to: Store.supportDirectory.appendingPathComponent("autosave.json")),
+                      "Legacy autosave written")
+        let store = Store()
+        assertEqual(store.project.entityName, "Example", "A pre-hierarchy autosave restores its project")
+        assertEqual(store.project.components.count, legacy.project.components.count, "with all of its components")
+        assertEqual(store.design.sheets.count, 1, "as a one-sheet design")
+        assertEqual(store.fileURL, url, "with its file URL")
+        assertFalse(store.dirty, "and its saved state")
+        store.loadDesign(HierarchySelfTest.haFA(), from: nil, dirty: true)
+        store.activeSheetID = store.design.sheet(named: "HA")!.id!
+        store.mutate { $0.notes = [TextNote(text: "half", x: 40, y: 400)] }
+        let again = Store()
+        assertEqual(again.design.sheets.count, 2, "A multi-sheet autosave restores every sheet")
+        assertEqual(again.project.entityName, "HA", "and the active sheet")
+        assertEqual(again.design.topLevelEntity, "FA", "and the top-level entity")
     }
 
 }

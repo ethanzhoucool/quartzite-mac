@@ -63,7 +63,7 @@ extension Store {
         guard let tc = toolchainSearch.toolchain else {
             return (nil, "\(toolchainSearch.summary). Build it with toolchain/build_toolchain.sh (docs/TOOLCHAIN_NOTES.md) to generate the experimental .sof.")
         }
-        var c = HardwareConfig(toolchain: tc, outputDirectory: Store.outputDirectory(project: project, fileURL: fileURL))
+        var c = HardwareConfig(toolchain: tc, outputDirectory: Store.outputDirectory(project: topProject, fileURL: fileURL))
         let cancel = ProcessCancel()
         c.cancel = cancel
         hardwareCancel = cancel
@@ -79,7 +79,7 @@ extension Store {
             lines += tc.tools.map { "\($0.name): \($0.url.path) (found via \($0.source))" }
             lines.append("")
             lines.append(useHardwareFlow
-                ? "Start Compilation runs yosys and nextpnr-mistral in the Fitter, and the Assembler writes an experimental .sof to \(Store.outputDirectory(project: project, fileURL: fileURL).path)."
+                ? "Start Compilation runs yosys and nextpnr-mistral in the Fitter, and the Assembler writes an experimental .sof to \(Store.outputDirectory(project: topProject, fileURL: fileURL).path)."
                 : "Turn on Processing > Use Open-Source Fitter and Assembler to generate the experimental .sof.")
         } else {
             for m in toolchainSearch.missing { lines.append("\(m.name): searched \(m.searched.joined(separator: ", "))") }
@@ -132,7 +132,7 @@ extension Store {
         let version = projectVersion
         let generation = UUID()
         flowGeneration = generation
-        var state = reusing ?? FlowState(project: project, mainTask: mainTask)
+        var state = reusing ?? FlowState(project: topProject, mainTask: mainTask)
         state.mainTask = mainTask
         if stages.contains(.fitter) || stages.contains(.assembler) {
             var (hw, note) = hardwareConfig()
@@ -228,7 +228,7 @@ extension Store {
     @discardableResult
     func compile() -> Bool {
         if isProcessing { resetFlow() }
-        let state = CompileFlow.run(project, stages: [.analysisElaboration], mainTask: "Analysis & Elaboration")
+        let state = CompileFlow.run(topProject, stages: [.analysisElaboration], mainTask: "Analysis & Elaboration")
         messages = state.messages
         flow = state
         stageStatus = [.analysisElaboration: state.runs.first?.status ?? .failed]
@@ -251,7 +251,7 @@ extension Store {
             messages.append(Message(level: .error, text: "Simulation is limited to 10 inputs (\(c.inputs.count) found)"))
             return
         }
-        guard let r = try? SimulationResult.run(c, project: project) else { return }
+        guard let r = try? SimulationResult.run(c, project: topProject) else { return }
         simulation = r
         var kids: [Message] = []
         for (i, name) in r.outputNames.enumerated() {
@@ -269,7 +269,7 @@ extension Store {
     /// Tools > Programmer: explains why programming happens in Quartus, and offers the
     /// experimental .sof when this compilation produced one.
     func openProgrammer() {
-        let quartus = "Export the project (Shift-Command-E), open \(project.entityName).qpf in Quartus Prime, run Start Compilation, then use Tools > Programmer with output_files/\(project.entityName).sof."
+        let quartus = "Export the project (Shift-Command-E), open \(topProject.entityName).qpf in Quartus Prime, run Start Compilation, then use Tools > Programmer with output_files/\(topProject.entityName).sof."
         if let a = flow?.assembly, a.passed, FileManager.default.fileExists(atPath: a.sofURL.path) {
             let al = NSAlert()
             al.messageText = "Programmer runs in Quartus"
@@ -289,13 +289,13 @@ extension Store {
     /// Saves the current Quartzite netlist (EDA Netlist Writer output).
     func saveNetlist() {
         guard let text = flow?.netlist else { return }
-        exportText(NetlistWriter.fileName(project.entityName), text)
+        exportText(NetlistWriter.fileName(topProject.entityName), text)
     }
 
     /// Saves the whole Compilation Report as text in the .rpt layout.
     func saveReport() {
         guard let f = flow else { return }
-        exportText("\(project.entityName)_quartzite.rpt", ReportText.render(CompileFlow.report(f)))
+        exportText("\(topProject.entityName)_quartzite.rpt", ReportText.render(CompileFlow.report(f)))
     }
 }
 #endif

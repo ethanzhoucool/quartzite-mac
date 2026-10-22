@@ -5,6 +5,8 @@ import Foundation
 enum TestDesigns {
     struct Builder {
         var p = Project()
+        /// Symbols of the design's sheets (lowercased entity name), for `block`.
+        var symbols: [String: SymbolDef] = [:]
         init(_ name: String) { p.name = name }
 
         @discardableResult
@@ -20,6 +22,23 @@ enum TestDesigns {
             add(Component(kind: kind, name: p.nextInstanceName(), x: x, y: y))
         }
         mutating func add(_ c: Component) -> Component { p.components.append(c); return c }
+        /// An instance of another sheet of the design (it must have a symbol).
+        @discardableResult
+        mutating func block(_ entity: String, x: Int, y: Int) -> Component {
+            guard let s = symbols[entity.lowercased()] else { preconditionFailure("\(entity) has no symbol") }
+            var c = Component(kind: .block, name: p.nextInstanceName(), x: x, y: y)
+            c.symbol = s
+            return add(c)
+        }
+        @discardableResult
+        mutating func vcc(x: Int, y: Int) -> Component { add(Component(kind: .vcc, name: p.nextInstanceName(), x: x, y: y)) }
+        @discardableResult
+        mutating func gnd(x: Int, y: Int) -> Component { add(Component(kind: .gnd, name: p.nextInstanceName(), x: x, y: y)) }
+        /// The port of a block, macro or gate with this name ("cin", "OA", "IN2").
+        func port(_ c: Component, _ name: String) -> PortRef {
+            guard let i = c.portIndex(named: name) else { preconditionFailure("\(c.symbolName) has no port \(name)") }
+            return PortRef(comp: c.id, port: i)
+        }
 
         /// Output port of a gate / input pin (the first output of a block or macro).
         func out(_ c: Component) -> PortRef { PortRef(comp: c.id, port: c.portIndices.first { c.isOutputPort($0) } ?? 0) }
@@ -28,6 +47,77 @@ enum TestDesigns {
         mutating func wire(_ a: PortRef, _ b: PortRef) { p.wires.append(Wire(a: a, b: b)) }
         mutating func wire(_ from: Component, to: Component, _ port: Int) { wire(out(from), pin(to, port)) }
         mutating func label(_ r: PortRef, _ name: String) { p.labels[r.key] = name }
+    }
+
+    /// Builds a multi-sheet design one sheet at a time.
+    struct DesignBuilder {
+        var d: DesignProject
+
+        init(_ name: String, top: String? = nil, device: String = CycloneV.device) {
+            d = DesignProject(name: name, device: device, topLevelEntity: top ?? name, sheets: [])
+        }
+
+        var symbols: [String: SymbolDef] {
+            Dictionary(d.sheets.compactMap { s in s.symbol.map { (s.entityName.lowercased(), $0) } }, uniquingKeysWith: { a, _ in a })
+        }
+
+        /// A builder for a new sheet that can place blocks of the sheets added so far.
+        func builder(_ entity: String) -> Builder {
+            var b = Builder(entity)
+            b.p.device = d.device
+            b.symbols = symbols
+            return b
+        }
+
+        mutating func sheet(_ b: Builder) {
+            var p = b.p
+            if p.id == nil { p.id = UUID() }
+            d.sheets.append(p)
+        }
+
+        /// File > Create/Update > Create Symbol Files for Current File on `entity`.
+        @discardableResult
+        mutating func createSymbol(_ entity: String) -> SymbolUpdateReport? {
+            guard let i = d.sheetIndex(named: entity), let id = d.sheets[i].id else { return nil }
+            return d.createSymbol(forSheet: id)
+        }
+    }
+
+    /// Half adder sheet: s = a XOR b, c = a AND b.
+    static func halfAdder(_ db: DesignBuilder, name: String = "HA") -> Builder {
+        var b = db.builder(name)
+        b.input("a", y: 64)
+        b.input("b", y: 112)
+        let x = b.gate(.xor2, x: 320, y: 40)
+        b.label(b.pin(x, 0), "a"); b.label(b.pin(x, 1), "b")
+        let g = b.gate(.and2, x: 320, y: 136)
+        b.label(b.pin(g, 0), "a"); b.label(b.pin(g, 1), "b")
+        let s = b.output("s", x: 480, y: 56)
+        b.wire(x, to: s, 0)
+        let c = b.output("c", x: 480, y: 152)
+        b.wire(g, to: c, 0)
+        return b
+    }
+
+    /// Full adder from two half adders: (s1, c1) = HA(x, y), (s, c2) = HA(s1, cin), cout = c1 + c2.
+    static func fullAdder(_ db: DesignBuilder, name: String = "FA", half: String = "HA") -> Builder {
+        var b = db.builder(name)
+        b.input("x", y: 64)
+        b.input("y", y: 112)
+        b.input("cin", y: 160)
+        let h1 = b.block(half, x: 280, y: 40)
+        b.label(b.port(h1, "a"), "x"); b.label(b.port(h1, "b"), "y")
+        b.label(b.port(h1, "s"), "s1"); b.label(b.port(h1, "c"), "c1")
+        let h2 = b.block(half, x: 280, y: 200)
+        b.label(b.port(h2, "a"), "s1"); b.label(b.port(h2, "b"), "cin")
+        let o = b.gate(.or2, x: 520, y: 280)
+        b.label(b.pin(o, 0), "c1")
+        b.wire(b.port(h2, "c"), b.pin(o, 1))
+        let s = b.output("s", x: 680, y: 224)
+        b.wire(b.port(h2, "s"), b.pin(s, 0))
+        let co = b.output("cout", x: 680, y: 296)
+        b.wire(o, to: co, 0)
+        return b
     }
 
     /// DE10-Standard switches SW3..SW0 for w, x, y, z and LEDR0 for f.

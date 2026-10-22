@@ -28,9 +28,9 @@ struct QuartziteApp: App {
     private var windowTitle: String {
         if let url = store.fileURL {
             let dir = (url.deletingLastPathComponent().path as NSString).abbreviatingWithTildeInPath
-            return "Quartzite - \(dir)/\(store.title) - \(store.project.entityName)"
+            return "Quartzite - \(dir)/\(store.title) - \(store.topProject.entityName)"
         }
-        return "Quartzite - \(store.project.entityName)"
+        return "Quartzite - \(store.topProject.entityName)"
     }
 }
 
@@ -128,7 +128,7 @@ struct QuartusCommands: Commands {
             Button("Auto-Assign Lab Pins (SW / LEDR)") { store.autoAssignPins() }
             Button("Import Assignments...") { store.importAssignments() }
             Button("Export Assignments...") {
-                store.exportText("\(store.project.entityName)_pins.qsf", QuartusExport.pinAssignments(store.project))
+                store.exportText("\(store.topProject.entityName)_pins.qsf", QuartusExport.pinAssignments(store.topProject))
             }
         }
         CommandMenu("Processing") {
@@ -346,11 +346,11 @@ struct EntityField: View {
 
     var body: some View {
         Menu {
-            Button { } label: { Label(store.project.entityName, systemImage: "checkmark") }
+            Button { } label: { Label(store.topProject.entityName, systemImage: "checkmark") }
             Divider()
             Text("Quartzite projects have one entity, named after the project")
         } label: {
-            Text(store.project.entityName).font(.callout)
+            Text(store.topProject.entityName).font(.callout)
         }
         .menuStyle(.borderlessButton)
         .frame(width: 170)
@@ -677,7 +677,7 @@ struct DocumentTabBar: View {
                 Button { store.tab = t } label: {
                     HStack(spacing: 6) {
                         Image(systemName: t.icon).font(.caption)
-                        Text(t == .report ? "Compilation Report - \(store.project.entityName)" : t.title(store.project)).font(.callout)
+                        Text(t == .report ? "Compilation Report - \(store.topProject.entityName)" : t.title(store.project)).font(.callout)
                         if t == .bdf && store.dirty { Text("*").foregroundStyle(.secondary) }
                     }
                     .padding(.horizontal, 14)

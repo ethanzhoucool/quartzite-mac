@@ -403,13 +403,16 @@ struct DeviceSheet: View {
         SheetFrame(title: "Device", okDisabled: device.trimmingCharacters(in: .whitespaces).isEmpty,
                    onOK: {
                        let value = device.trimmingCharacters(in: .whitespaces).uppercased()
-                       store.mutate { $0.device = value }
+                       store.mutateDesign { d in
+                           d.device = value
+                           for i in d.sheets.indices { d.sheets[i].device = value }
+                       }
                        store.sheet = nil
                    }, onCancel: { store.sheet = nil }) {
             TextField("Cyclone V device", text: $device).textFieldStyle(.roundedBorder)
         }
         .frame(width: 420)
-        .onAppear { device = store.project.device }
+        .onAppear { device = store.design.device }
     }
 }
 
