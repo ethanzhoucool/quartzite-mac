@@ -187,7 +187,8 @@ files feed SignalTap and System Console, and are presumably not needed for confi
 **[verified 24]**. It is not a copy of the .rbf option RAM: no 40-bit ORAM strip appears in it at any bit offset,
 in either bit order **[verified 1]**. The two exceptions differ in a few bits: SaleTerminal (20.1.1) at bytes 0x01,
 0x1E and 0x1F, and the Quartus 14.0 OpenCL file at bytes 0x15 and 0x4C (see 3.1, bit 2.10). Apart from that, its
-mapping is unknown. SOF.swift writes the common value.
+mapping is unknown. SOF.swift writes the common value, and conversion refuses a .sof whose option record is not 110
+bytes (an empty or cut record would otherwise convert with default options).
 
 ## 6. RBF to SOF
 

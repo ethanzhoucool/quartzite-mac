@@ -252,6 +252,11 @@ struct SOFFile {
                 throw SOFError.invalid(String(format: "expected one record with tag 0x%04x", tag))
             }
         }
+        // Every Quartus file seen (14.0 to 25.1) has a 110-byte option record; an empty or cut one would convert with defaults.
+        let options = body(Tag.options)?.count ?? 0
+        guard options == SOFFile.defaultOptions.count else {
+            throw SOFError.invalid("option record (tag 0x0012) is \(options) bytes instead of \(SOFFile.defaultOptions.count)")
+        }
         guard let crc = storedCRC, crc == computedCRC() else { throw SOFError.invalid("file CRC mismatch or missing final CRC") }
         guard let sum = storedChecksum, sum == computedChecksum() else { throw SOFError.invalid("payload checksum mismatch or malformed payload") }
     }

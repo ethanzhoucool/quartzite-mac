@@ -111,6 +111,14 @@ enum SOFSelfTest {
             } else { check(false, "malformed payload remains inspectable") }
             check((try? SOFFile(config: cfg, device: "5CSEBA6U23I7", options: .init(template: sof))) == nil,
                   "template for a different package/device is rejected")
+            for size in [0, 0x15, 109] {
+                broken = sof
+                let oi = broken.records.firstIndex { $0.tag == SOFFile.Tag.options }!
+                broken.records[oi].body = Data(SOFFile.defaultOptions.prefix(size))
+                broken.updateCRC()
+                check((try? broken.validate()) == nil && (try? broken.extractRBF()) == nil,
+                      "a \(size)-byte option record blocks conversion even with a valid file CRC")
+            }
         } else { check(false, "SOF regression fixture wraps") }
         check((try? SOFFile(config: cfg, device: "5CSXFC6D6F31C6", options: .init(layout: 15))) == nil,
               "unsupported SOF layouts are rejected")
