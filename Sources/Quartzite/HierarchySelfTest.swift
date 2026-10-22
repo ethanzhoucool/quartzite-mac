@@ -38,6 +38,7 @@ enum HierarchySelfTest {
         model(check)
         sheetOps(check)
         writers(check)
+        macros(check)
     }
 
     /// HA and FA (two HA blocks), top FA, symbols created.
@@ -230,6 +231,96 @@ enum HierarchySelfTest {
         if let t = fixture("lab2/vcc_symbol.txt", check) {
             check(v.replacingOccurrences(of: "\"inst\"", with: "\"vcc_ctl\"").contains(t.replacingOccurrences(of: "\r\n", with: "\n")),
                   "a VCC on a sheet is written exactly as Quartus writes it")
+        }
+    }
+
+    // MARK: - Library macros and VCC/GND (plan 2.1-2.3)
+
+    static func macros(_ check: Check) {
+        print("Library macros and VCC/GND")
+        let m = MacroLibrary.ttl7447
+        check(MacroLibrary.named("7447")?.name == "7447" && MacroLibrary.named("nope") == nil, "MacroLibrary finds the 7447")
+        let sym = MacroLibrary.symbol(m)
+        check(sym.width == 120 && sym.height == 160 && sym.ports.count == 15 && sym.source == .library
+              && sym.libraryPath == ["others", "maxplus2"], "the 7447 symbol is 120 x 160 with 15 ports from others > maxplus2")
+        check(Set(sym.inputs.map(\.name)) == Set(m.inputs) && Set(sym.outputs.map(\.name)) == Set(m.outputs),
+              "the 7447 symbol's ports are the macro's inputs and outputs")
+        if let t = fixture("lab2/sym7447_template.txt", check) {
+            check(MacroLibrary.sym7447 + "\n" == t || MacroLibrary.sym7447 == t, "the 7447 symbol text is a byte copy of the Quartus template")
+        }
+
+        // Lit segments (a...g) for 0-9; 10-15 follow the plan's table.
+        let lit = ["abcdef", "bc", "abdeg", "abcdg", "bcfg", "acdfg", "cdefg", "abc", "abcdefg", "abcfg"]
+        func run(_ n: Int, ltn: Bool = true, rbin: Bool = true, bin: Bool = true) -> [Bool] {
+            m.function([n & 1 != 0, n & 2 != 0, n & 4 != 0, n & 8 != 0, ltn, rbin, bin])
+        }
+        var digitsOK = true, tableOK = true, rbonOK = true
+        for n in 0..<16 {
+            let out = run(n)
+            for (s, seg) in "abcdefg".enumerated() {
+                if n < 10 && out[s] != !lit[n].contains(seg) { digitsOK = false }
+                if out[s] != MacroLibrary.segmentsOff7447[s].contains(n) { tableOK = false }
+            }
+            if !out[7] { rbonOK = false }
+        }
+        check(digitsOK, "7447 shows 0-9 with the TTL shapes (6 without its top bar, 9 without its tail)")
+        check(tableOK, "7447 segments match the plan's table for n = 0...15")
+        check(rbonOK, "RBON is 1 whenever RBIN = 1")
+        var controlsOK = true
+        for n in 0..<16 {
+            for ltn in [false, true] { for rbin in [false, true] where run(n, ltn: ltn, rbin: rbin, bin: false).prefix(7).contains(false) { controlsOK = false } }
+            if run(n, ltn: false, rbin: true).prefix(7).contains(true) || run(n, ltn: false, rbin: false).prefix(7).contains(true) { controlsOK = false }
+            let blank = run(n, rbin: false)
+            if n == 0 { if blank != Array(repeating: true, count: 7) + [false] { controlsOK = false } }
+            else if blank != run(n) { controlsOK = false }
+        }
+        check(controlsOK, "BIN = 0 blanks, LTN = 0 lights every segment, RBIN = 0 blanks only a 0 and then drives RBON low")
+
+        let net = MacroSynth.netlist(m)
+        // Port names such as OF are reserved words at the top level; the flattener renames
+        // every internal node, so check a copy with prefixed names.
+        var named = net
+        for i in named.components.indices where named.components[i].kind.isPin { named.components[i].name = "m_" + named.components[i].name }
+        named.labels = named.labels.mapValues { "m_" + $0 }
+        let (circuit, msgs) = Compiler.compile(named, checkLocations: false)
+        check(circuit != nil, "the 7447 gate model compiles (\(msgs.filter { $0.level == .error }.map(\.text).prefix(3)))")
+        check(net.inputPins.map(\.name) == m.inputs && net.outputPins.map(\.name) == m.outputs, "the gate model's pins are the macro's ports, in order")
+        if let c = circuit {
+            var same = true
+            for row in 0..<128 {
+                let bits = (0..<7).map { k in (row >> (6 - k)) & 1 == 1 }
+                if c.evaluate(bits).outputs != m.function(bits) { same = false }
+            }
+            check(same, "the 7447 gate model equals its function on all 128 rows")
+            print("  info 7447 gate model: \(c.stats.gates) gates (\(c.stats.inverters) NOT), \(c.stats.gateInputs) gate inputs")
+        }
+        check(net.isFlatNetlist && net.components.allSatisfy { $0.x == 0 }, "the gate model is connected by name only")
+        check(MacroLibrary.netlist(m).components.count == net.components.count, "the cached gate model is the same size")
+
+        for (kind, gate, value) in [(GateKind.vcc, GateKind.and2, true), (GateKind.gnd, GateKind.or2, false)] {
+            var b = TestDesigns.Builder("const_\(kind.rawValue)")
+            let a = b.input("a", y: 64)
+            let k = kind == .vcc ? b.vcc(x: 200, y: 120) : b.gnd(x: 200, y: 160)
+            let g = b.gate(gate, x: 320, y: 48)
+            b.wire(a, to: g, 0)
+            b.wire(b.out(k), b.pin(g, 1))
+            let f = b.output("f", x: 520, y: 64)
+            b.wire(g, to: f, 0)
+            let name = kind.bdfName
+            let (cc, _) = Compiler.compile(b.p, checkLocations: false)
+            check(cc != nil && cc!.stats.gates == 1, "\(name) driving \(gate.bdfName) compiles; \(name) is not counted as a gate")
+            if let cc {
+                check(cc.evaluate([false]).outputs == [false] && cc.evaluate([true]).outputs == [true],
+                      "\(gate.bdfName)(a, \(name)) simulates as a (\(name) = \(value ? 1 : 0))")
+                let v = QuartusExport.verilog(b.p, conn: cc.conn)
+                check(v.contains("= 1'b\(value ? 1 : 0);"), "the Verilog backup assigns 1'b\(value ? 1 : 0) for \(name)")
+                if let syn = try? Synthesizer.run(cc, project: b.p) {
+                    check(!syn.removed.contains { $0.kind == kind }, "\(name) is not reported as a redundant gate")
+                } else {
+                    check(false, "synthesis runs with \(name)")
+                }
+                check((try? QuartusExport.makeBundle(b.p, conn: cc.conn)) != nil, "a sheet with \(name) exports")
+            }
         }
     }
 

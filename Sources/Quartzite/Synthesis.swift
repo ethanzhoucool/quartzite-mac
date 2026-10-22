@@ -283,7 +283,7 @@ enum Synthesizer {
             .map { (term: Equation.sop([$0], names: names), outputs: termOwners[$0]!) }
 
         var gates = 0, gateInputs = 0
-        for g in c.gateOrder { gates += 1; gateInputs += g.kind.arity }
+        for g in c.gateOrder where g.kind.isGate { gates += 1; gateInputs += g.kind.arity }
 
         return SynthesisResult(inputNames: inputNames, outputs: outs, network: net, removed: removed,
                                unusedInputs: unused, sharedTerms: shared,
@@ -309,7 +309,7 @@ enum Synthesizer {
         var removed: [SynthesisResult.RemovedGate] = []
         var earlier: [(TruthTable, String)] = []
         let zero = TruthTable(n: n)
-        for g in c.gateOrder {
+        for g in c.gateOrder where g.kind.isGate {
             guard live.contains(g.id) else {
                 removed.append(.init(name: g.name, kind: g.kind, id: g.id, reason: .noFanout))
                 continue

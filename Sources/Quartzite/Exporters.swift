@@ -421,6 +421,9 @@ enum QuartusExport {
             case .nor: prim = "nor"
             case .xor: prim = "xor"
             case .xnor: prim = "xnor"
+            case .vcc, .gnd:
+                body.append("\tassign \(o) = 1'b\(g.kind == .vcc ? 1 : 0);")
+                continue
             default: continue
             }
             let args = ([o] + ins).joined(separator: ", ")

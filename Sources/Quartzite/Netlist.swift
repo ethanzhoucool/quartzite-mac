@@ -64,8 +64,9 @@ struct Connectivity {
 
         var linked = Set<Int>()
         // Quartus connects ports that sit on the same point, even without a wire.
+        // Generated netlists have no geometry.
         var byPoint: [String: Int] = [:]
-        for c in project.components {
+        for c in project.components where !project.isFlatNetlist {
             for i in c.portIndices {
                 let pt = c.portPoint(i)
                 let key = "\(Int(pt.x)),\(Int(pt.y))"
@@ -365,7 +366,7 @@ enum Compiler {
         }
 
         var stats = CompiledCircuit.Stats()
-        for g in gates {
+        for g in gates where g.kind.isGate {
             stats.gates += 1
             stats.gateInputs += g.kind.arity
             if g.kind == .not {

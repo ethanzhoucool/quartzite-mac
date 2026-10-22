@@ -30,6 +30,14 @@ enum TestDesigns {
             c.symbol = s
             return add(c)
         }
+        /// A library macro ("7447").
+        @discardableResult
+        mutating func macro(_ name: String, x: Int, y: Int) -> Component {
+            guard let m = MacroLibrary.named(name) else { preconditionFailure("no macro \(name)") }
+            var c = Component(kind: .macro, name: p.nextInstanceName(), x: x, y: y)
+            c.symbol = MacroLibrary.symbol(m)
+            return add(c)
+        }
         @discardableResult
         mutating func vcc(x: Int, y: Int) -> Component { add(Component(kind: .vcc, name: p.nextInstanceName(), x: x, y: y)) }
         @discardableResult
