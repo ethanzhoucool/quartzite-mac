@@ -3,7 +3,7 @@ import Foundation
 /// Command-line entry points (also used by CI on Linux, where there is no UI).
 enum CLI {
     static let flags = ["--compile", "--selftest", "--export-suite", "--export-project", "--render-project", "--snapshot-window",
-                        "--sof-info", "--sof-to-rbf", "--rbf-to-sof", "--sof-verify", "--build-design"]
+                        "--sof-info", "--sof-to-rbf", "--rbf-to-sof", "--sof-verify", "--build-design", "--import"]
 
     static func wants(_ args: [String]) -> Bool { args.contains { flags.contains($0) } }
 
@@ -112,6 +112,14 @@ enum CLI {
                 print("built \(d.name): \(d.sheets.count) sheets, top \(d.topLevelEntity)")
                 return 0
             }
+            if let file = value(after: "--import"), let i = args.firstIndex(of: "--import"), i + 2 < args.count {
+                // Quartzite --import <file.qpf|.qsf|.bdf> <out.qzproj>
+                let r = try QuartusImport.importProject(at: URL(fileURLWithPath: file))
+                for n in r.notes { print("note: \(n)") }
+                try r.design.encoded().write(to: URL(fileURLWithPath: args[i + 2]))
+                print("imported \(r.design.name): \(r.design.sheets.count) sheet(s), top \(r.design.topLevelEntity)")
+                return 0
+            }
             if let file = value(after: "--export-project"), let i = args.firstIndex(of: "--export-project"), i + 2 < args.count {
                 let d = try loadDesign(file)
                 let folder = args[i + 2]
@@ -193,7 +201,7 @@ enum CLI {
             FileHandle.standardError.write(Data("error: \(error.localizedDescription)\n".utf8))
             return 1
         }
-        print("usage: Quartzite --selftest [dir] | --sof-info <f.sof> | --sof-to-rbf <in.sof> <out.rbf> [--compressed] | --rbf-to-sof <in.rbf> <device> <out.sof> [--template f.sof] [--layout 14|16|17] [--project name] [--compiler-version s] | --compile <file.qzproj> [--report] [--sof <out.sof> [--layout 14|16|17] [--work dir] [--seed n]] | --sof-verify <samples dir> | --sof-verify <file.qzproj> <file.sof> [--work dir] | --export-suite <dir> | --export-project <file.qzproj> <dir> | --build-design <spec.json> <out.qzproj>")
+        print("usage: Quartzite --selftest [dir] | --sof-info <f.sof> | --sof-to-rbf <in.sof> <out.rbf> [--compressed] | --rbf-to-sof <in.rbf> <device> <out.sof> [--template f.sof] [--layout 14|16|17] [--project name] [--compiler-version s] | --compile <file.qzproj> [--report] [--sof <out.sof> [--layout 14|16|17] [--work dir] [--seed n]] | --sof-verify <samples dir> | --sof-verify <file.qzproj> <file.sof> [--work dir] | --export-suite <dir> | --export-project <file.qzproj> <dir> | --build-design <spec.json> <out.qzproj> | --import <file.qpf|.qsf|.bdf> <out.qzproj>")
         return 2
     }
 }
