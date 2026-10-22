@@ -13,11 +13,12 @@ enum GateDrawing {
 
     static func parts(_ k: GateKind) -> Parts { parts(k, .none) }
 
-    static func parts(_ c: Component) -> Parts { parts(c.kind, c.orient) }
+    static func parts(_ c: Component) -> Parts { parts(c.primitive, c.orient) }
 
-    static func parts(_ k: GateKind, _ o: Orientation) -> Parts {
+    static func parts(_ k: GateKind, _ o: Orientation) -> Parts { parts(k.primitive, o) }
+
+    static func parts(_ prim: Primitive, _ o: Orientation) -> Parts {
         var p = Parts()
-        let prim = k.primitive
         for d in prim.drawing { add(d.oriented(o, in: prim.size), to: &p.stroke) }
         for port in prim.ports where port.pt != port.lineEnd {
             var lead = Path()
@@ -37,6 +38,8 @@ enum GateDrawing {
             path.addLine(to: b)
         case .circle(let r):
             path.addEllipse(in: r)
+        case .rectangle(let r):
+            path.addRect(r)
         case .arc(let a, let b, let r):
             // Counter-clockwise on screen from a to b, i.e. decreasing angle in y-down coordinates.
             let c = CGPoint(x: r.midX, y: r.midY), rx = r.width / 2, ry = r.height / 2

@@ -89,6 +89,8 @@ enum Shape: Equatable {
     /// on screen from the first point to the second.
     case arc(CGPoint, CGPoint, CGRect)
     case circle(CGRect)
+    /// A block body: (rectangle (rect ...)).
+    case rectangle(CGRect)
 
     func oriented(_ o: Orientation, in s: CGSize) -> Shape {
         switch self {
@@ -98,6 +100,7 @@ enum Shape: Equatable {
             let pa = o.point(a, in: s), pb = o.point(b, in: s)
             return o.isMirror ? .arc(pb, pa, o.rect(r, in: s)) : .arc(pa, pb, o.rect(r, in: s))
         case .circle(let r): return .circle(o.rect(r, in: s))
+        case .rectangle(let r): return .rectangle(o.rect(r, in: s))
         }
     }
 }
@@ -121,7 +124,16 @@ struct Primitive {
 }
 
 extension GateKind {
-    var primitive: Primitive { Primitive.table[self]! }
+    /// Library geometry. VCC and GND come from `BuiltinSymbols`; a block or macro has no
+    /// geometry of its own (its component's `symbol` has it), so it gets an empty placeholder.
+    var primitive: Primitive {
+        if let p = Primitive.table[self] { return p }
+        switch self {
+        case .vcc: return BuiltinSymbols.vccPrimitive
+        case .gnd: return BuiltinSymbols.gndPrimitive
+        default: return Primitive(size: CGSize(width: 16, height: 16), ports: [], drawing: [], body: CGRect(x: 0, y: 0, width: 16, height: 16))
+        }
+    }
 }
 
 extension Primitive {
@@ -213,7 +225,7 @@ enum Caption {
     }
     /// Instance name under a gate, e.g. "inst3".
     static func instanceRect(_ k: GateKind, _ name: String) -> CGRect {
-        let h = k.size.height
+        let h = k.primitive.size.height
         return CGRect(x: 3, y: h - 11, width: CGFloat(width(name)), height: 12)
     }
     static func pinNameRect(_ k: GateKind, _ name: String) -> CGRect {
@@ -235,26 +247,69 @@ enum Caption {
 
 extension Component {
     var orient: Orientation { orientation ?? .none }
+
+    /// VCC and GND symbols (they have no `symbol` of their own).
+    var builtinSymbol: SymbolDef? {
+        switch kind {
+        case .vcc: return BuiltinSymbols.vcc
+        case .gnd: return BuiltinSymbols.gnd
+        default: return nil
+        }
+    }
+
+    /// The symbol's geometry: a block's or macro's own symbol, VCC/GND, or the primitive library.
+    var primitive: Primitive { symbol?.primitive ?? kind.primitive }
+    /// Size in library coordinates (before rotation).
+    var librarySize: CGSize { primitive.size }
     /// Size on the sheet (width and height swap for quarter turns).
-    var size: CGSize { orient.size(kind.size) }
+    var size: CGSize { orient.size(librarySize) }
+
+    /// Port positions in library coordinates, in port-index order.
+    var portPoints: [CGPoint] { primitive.ports.map { $0.pt } }
+    var portCount: Int { primitive.ports.count }
+    var portIndices: Range<Int> { 0..<portCount }
+    func isOutputPort(_ index: Int) -> Bool {
+        let ports = primitive.ports
+        return ports.indices.contains(index) && ports[index].isOutput
+    }
+    /// Quartus port name ("IN1", "OUT", "cin", "OA"); empty for pins.
+    func portName(_ index: Int) -> String {
+        let ports = primitive.ports
+        return ports.indices.contains(index) ? ports[index].name : ""
+    }
+    func portIndex(named n: String) -> Int? {
+        primitive.ports.firstIndex { $0.name.caseInsensitiveCompare(n) == .orderedSame }
+    }
+    /// Name in the symbol library: "AND2", "VCC", "7447", or a block's entity name.
+    var symbolName: String { symbol?.name ?? builtinSymbol?.name ?? kind.bdfName }
 
     /// Library coordinates to sheet coordinates.
     func toSheet(_ p: CGPoint) -> CGPoint {
-        let q = orient.point(p, in: kind.size)
+        let q = orient.point(p, in: librarySize)
         return CGPoint(x: CGFloat(x) + q.x, y: CGFloat(y) + q.y)
     }
 
     func toSheet(_ r: CGRect) -> CGRect {
-        orient.rect(r, in: kind.size).offsetBy(dx: CGFloat(x), dy: CGFloat(y))
+        orient.rect(r, in: librarySize).offsetBy(dx: CGFloat(x), dy: CGFloat(y))
     }
 
-    /// Unit vector pointing out of the symbol at a port (the way a wire leaves it).
+    /// Unit vector pointing out of the symbol at a port (the way a wire leaves it). Primitive
+    /// gates and pins face left (inputs) or right (outputs); a block, macro, VCC or GND port
+    /// faces along its lead (VCC's output points down).
     func portDirection(_ index: Int) -> CGPoint {
-        orient.vector(CGPoint(x: kind.isOutputPort(index) ? 1 : -1, y: 0))
+        if symbol != nil || builtinSymbol != nil, primitive.ports.indices.contains(index) {
+            let p = primitive.ports[index]
+            let dx = p.pt.x - p.lineEnd.x, dy = p.pt.y - p.lineEnd.y
+            if dx != 0 || dy != 0 {
+                let v = abs(dx) >= abs(dy) ? CGPoint(x: dx > 0 ? 1 : -1, y: 0) : CGPoint(x: 0, y: dy > 0 ? 1 : -1)
+                return orient.vector(v)
+            }
+        }
+        return orient.vector(CGPoint(x: isOutputPort(index) ? 1 : -1, y: 0))
     }
 
     /// The drawn body on the sheet, which wires should not cross.
-    var body: CGRect { toSheet(kind.primitive.body) }
+    var body: CGRect { toSheet(primitive.body) }
 
     /// The same symbol after applying `op` (Rotate / Flip), turning about its centre.
     /// Nil when Quartus could not store the result (see `Orientation`).

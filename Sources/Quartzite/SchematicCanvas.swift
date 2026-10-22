@@ -12,7 +12,7 @@ struct SheetHitTester {
     func port(_ p: CGPoint, radius: CGFloat = 7) -> PortRef? {
         var best: (PortRef, CGFloat)?
         for c in store.project.components.reversed() {
-            for i in c.kind.allPorts.indices {
+            for i in c.portIndices {
                 let q = c.portPoint(i)
                 let d = hypot(q.x - p.x, q.y - p.y)
                 if d <= radius, d < (best?.1 ?? .infinity) { best = (PortRef(comp: c.id, port: i), d) }

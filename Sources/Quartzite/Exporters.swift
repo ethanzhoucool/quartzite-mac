@@ -176,6 +176,7 @@ enum QuartusExport {
         case .line(let a, let b): return "(line \(pt(a))\(pt(b)))"
         case .arc(let a, let b, let r): return "(arc \(pt(a))\(pt(b))\(rectText(r)))"
         case .circle(let r): return "(circle \(rectText(r)))"
+        case .rectangle(let r): return "(rectangle \(rectText(r)))"
         }
     }
 
@@ -184,12 +185,12 @@ enum QuartusExport {
     private static func caption(_ text: String, _ r: CGRect, _ c: Component, font: String, extra: String = "") -> String {
         let o = c.orient
         let vertical = o.swapsAxes ? "(vertical)" : ""
-        return "(text \"\(escape(text))\" \(rectText(o.rect(r, in: c.kind.size)))(font \"Arial\" \(font))\(vertical)\(extra))"
+        return "(text \"\(escape(text))\" \(rectText(o.rect(r, in: c.librarySize)))(font \"Arial\" \(font))\(vertical)\(extra))"
     }
 
     private static func drawing(_ c: Component) -> String {
         var s = "\t(drawing\n"
-        for d in c.kind.primitive.drawing { s += "\t\t\(shape(d.oriented(c.orient, in: c.kind.size)))\n" }
+        for d in c.primitive.drawing { s += "\t\t\(shape(d.oriented(c.orient, in: c.librarySize)))\n" }
         s += "\t)\n"
         if let tag = c.orient.bdfTag { s += "\t(\(tag))\n" }
         return s
@@ -389,6 +390,7 @@ enum QuartusExport {
         var wires: [String] = []
         var body: [String] = []
         for g in p.components where !g.kind.isPin {
+            assert(!g.kind.isHierarchical, "the Verilog backup is written from the flattened design")
             let outNet = conn.netOf[PortRef(comp: g.id, port: g.kind.arity)]!
             let o = name(outNet)
             let ins = (0..<g.kind.arity).map { name(conn.netOf[PortRef(comp: g.id, port: $0)]!) }

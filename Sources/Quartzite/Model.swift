@@ -9,10 +9,16 @@ enum GateKind: String, Codable, CaseIterable, Identifiable {
     case nand2, nand3, nand4
     case nor2, nor3, nor4
     case xor2, xnor2
+    /// Constant drivers (primitives > other > vcc / gnd).
+    case vcc, gnd
+    /// An instance of another sheet of the project (`Component.symbol` names it).
+    case block
+    /// A library macro such as the 7447 (`Component.symbol` names it).
+    case macro
 
     var id: String { rawValue }
 
-    enum Family { case pinIn, pinOut, not, and, or, nand, nor, xor, xnor }
+    enum Family { case pinIn, pinOut, not, and, or, nand, nor, xor, xnor, vcc, gnd, symbol }
 
     var family: Family {
         switch self {
@@ -25,15 +31,21 @@ enum GateKind: String, Codable, CaseIterable, Identifiable {
         case .nor2, .nor3, .nor4: return .nor
         case .xor2: return .xor
         case .xnor2: return .xnor
+        case .vcc: return .vcc
+        case .gnd: return .gnd
+        case .block, .macro: return .symbol
         }
     }
 
     var isPin: Bool { self == .input || self == .output }
 
+    /// Blocks and macros stand for a whole sub-design; they are flattened before elaboration.
+    var isHierarchical: Bool { self == .block || self == .macro }
+
     /// Number of logic inputs.
     var arity: Int {
         switch self {
-        case .input: return 0
+        case .input, .vcc, .gnd, .block, .macro: return 0
         case .output, .not: return 1
         case .and2, .or2, .nand2, .nor2, .xor2, .xnor2: return 2
         case .and3, .or3, .nand3, .nor3: return 3
@@ -49,6 +61,8 @@ enum GateKind: String, Codable, CaseIterable, Identifiable {
         case .not: return "NOT"
         case .xor2: return "XOR"
         case .xnor2: return "XNOR"
+        case .block: return "BLOCK"
+        case .macro: return "MACRO"
         default: return rawValue.uppercased()
         }
     }
@@ -57,6 +71,8 @@ enum GateKind: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .input: return "Input Pin"
         case .output: return "Output Pin"
+        case .block: return "Block"
+        case .macro: return "Library Macro"
         default: return bdfName
         }
     }
@@ -90,11 +106,19 @@ enum GateKind: String, Codable, CaseIterable, Identifiable {
         case .nor: return !inputs.contains(true)
         case .xor: return inputs.filter { $0 }.count % 2 == 1
         case .xnor: return inputs.filter { $0 }.count % 2 == 0
+        case .vcc: return true
+        case .gnd: return false
+        case .symbol:
+            assertionFailure("blocks and macros are flattened before evaluation")
+            return false
         }
     }
 
     static let gates: [GateKind] = [.not, .and2, .and3, .and4, .or2, .or3, .or4,
                                     .nand2, .nand3, .nand4, .nor2, .nor3, .nor4, .xor2, .xnor2]
+
+    /// Kinds placed straight from the primitives library (blocks and macros need a symbol).
+    static let placeable: [GateKind] = gates + [.input, .output, .vcc, .gnd]
 }
 
 struct Component: Codable, Identifiable, Hashable {
@@ -110,11 +134,13 @@ struct Component: Codable, Identifiable, Hashable {
     var orientation: Orientation? = nil
     /// Input pins only: the "Default value" from Pin Properties ("VCC" when nil, or "GND").
     var defaultValue: String? = nil
+    /// Blocks and macros: the symbol this instance was placed (or last updated) with.
+    var symbol: SymbolDef? = nil
 
     var origin: CGPoint { CGPoint(x: x, y: y) }
     var frame: CGRect { CGRect(origin: origin, size: size) }
 
-    func portPoint(_ index: Int) -> CGPoint { toSheet(kind.allPorts[index]) }
+    func portPoint(_ index: Int) -> CGPoint { toSheet(portPoints[index]) }
 }
 
 struct PortRef: Codable, Hashable {
@@ -150,11 +176,18 @@ struct Project: Codable {
     var device: String = "5CSXFC6D6F31C6"
     /// Free text from the Block Editor's Text Tool (optional so older files still load).
     var notes: [TextNote]? = nil
+    /// Identifies the sheet inside a multi-sheet design (nil in single-sheet v1 files).
+    var id: UUID? = nil
+    /// This sheet's .bsf, made by Create Symbol Files for Current File.
+    var symbol: SymbolDef? = nil
+    /// A generated netlist (macro internals, flattened designs): connected by labels only,
+    /// so geometry such as ports on the same point is ignored. Never saved.
+    var isFlatNetlist = false
 
     init() {}
 
     enum CodingKeys: String, CodingKey {
-        case name, components, wires, labels, inputOrder, expected, device, notes
+        case name, components, wires, labels, inputOrder, expected, device, notes, id, symbol
     }
 
     init(from decoder: Decoder) throws {
@@ -167,6 +200,8 @@ struct Project: Codable {
         expected = try c.decode([String: String].self, forKey: .expected)
         device = try c.decode(String.self, forKey: .device)
         notes = try c.decodeIfPresent([TextNote].self, forKey: .notes)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id)
+        symbol = try c.decodeIfPresent(SymbolDef.self, forKey: .symbol)
         let errors = structuralErrors
         guard errors.isEmpty else {
             throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
@@ -193,7 +228,7 @@ struct Project: Codable {
     }
 
     func contains(_ ref: PortRef) -> Bool {
-        component(ref.comp)?.kind.allPorts.indices.contains(ref.port) ?? false
+        component(ref.comp).map { (0..<$0.portCount).contains(ref.port) } ?? false
     }
 
     func component(_ id: UUID) -> Component? { components.first { $0.id == id } }

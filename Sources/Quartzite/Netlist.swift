@@ -50,7 +50,7 @@ struct Connectivity {
         guard project.structuralErrors.isEmpty else { return }
         var all: [PortRef] = []
         for c in project.components {
-            for i in c.kind.allPorts.indices { all.append(PortRef(comp: c.id, port: i)) }
+            for i in c.portIndices { all.append(PortRef(comp: c.id, port: i)) }
         }
         var index: [PortRef: Int] = [:]
         for (i, p) in all.enumerated() { index[p] = i }
@@ -66,7 +66,7 @@ struct Connectivity {
         // Quartus connects ports that sit on the same point, even without a wire.
         var byPoint: [String: Int] = [:]
         for c in project.components {
-            for i in c.kind.allPorts.indices {
+            for i in c.portIndices {
                 let pt = c.portPoint(i)
                 let key = "\(Int(pt.x)),\(Int(pt.y))"
                 guard let me = index[PortRef(comp: c.id, port: i)] else { continue }
@@ -106,7 +106,7 @@ struct Connectivity {
         }
 
         var rootToNet: [Int: Int] = [:]
-        let kinds = Dictionary(uniqueKeysWithValues: project.components.map { ($0.id, $0.kind) })
+        let comps = Dictionary(uniqueKeysWithValues: project.components.map { ($0.id, $0) })
         for (i, p) in all.enumerated() {
             let r = find(i)
             let nid: Int
@@ -118,7 +118,7 @@ struct Connectivity {
             nets[nid].ports.append(p)
             for n in nameOfPort[i] ?? [] where !nets[nid].names.contains(n) { nets[nid].names.append(n) }
             if linked.contains(i) { nets[nid].hasExplicitLink = true }
-            if let k = kinds[p.comp], k.isOutputPort(p.port) { nets[nid].drivers.append(p) } else { nets[nid].sinks.append(p) }
+            if let c = comps[p.comp], c.isOutputPort(p.port) { nets[nid].drivers.append(p) } else { nets[nid].sinks.append(p) }
             netOf[p] = nid
         }
     }
@@ -166,6 +166,7 @@ struct CompiledCircuit {
             if let n = conn.netOf[PortRef(comp: pin.id, port: 0)] { value[n] = bit }
         }
         for g in gateOrder {
+            assert(!g.kind.isHierarchical, "blocks and macros are flattened before evaluation")
             let ins = (0..<g.kind.arity).map { i -> Bool in
                 guard let n = conn.netOf[PortRef(comp: g.id, port: i)] else { return false }
                 return value[n] ?? false
@@ -285,7 +286,7 @@ enum Compiler {
         func describe(_ p: PortRef) -> String {
             guard let c = project.component(p.comp) else { return "?" }
             if c.kind.isPin { return "pin '\(c.name)'" }
-            return "\(c.name) (\(c.kind.bdfName)).\(c.kind.portName(p.port))"
+            return "\(c.name) (\(c.symbolName)).\(c.portName(p.port))"
         }
         for (a, b) in conn.touching {
             warn("\(describe(a)) and \(describe(b)) sit on the same point, so they are connected. Move one if that wasn't intended.", a.comp)
@@ -305,13 +306,13 @@ enum Compiler {
                 for s in net.sinks {
                     guard let c = project.component(s.comp) else { continue }
                     if c.kind == .output { err("Output pin '\(c.name)' is not driven by anything", c.id) }
-                    else { err("Input \(c.kind.portName(s.port)) of \(c.name) (\(c.kind.bdfName)) is not connected", c.id) }
+                    else { err("Input \(c.portName(s.port)) of \(c.name) (\(c.symbolName)) is not connected", c.id) }
                 }
             } else if net.sinks.isEmpty {
                 for d in net.drivers {
                     guard let c = project.component(d.comp) else { continue }
                     if c.kind == .input { warn("Input pin '\(c.name)' does not drive any logic", c.id) }
-                    else { warn("Output of \(c.name) (\(c.kind.bdfName)) is not used", c.id) }
+                    else { warn("Output of \(c.name) (\(c.symbolName)) is not used", c.id) }
                 }
             }
         }

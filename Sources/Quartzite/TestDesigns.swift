@@ -21,8 +21,8 @@ enum TestDesigns {
         }
         mutating func add(_ c: Component) -> Component { p.components.append(c); return c }
 
-        /// Output port of a gate / input pin.
-        func out(_ c: Component) -> PortRef { PortRef(comp: c.id, port: c.kind.inputPorts.count) }
+        /// Output port of a gate / input pin (the first output of a block or macro).
+        func out(_ c: Component) -> PortRef { PortRef(comp: c.id, port: c.portIndices.first { c.isOutputPort($0) } ?? 0) }
         func pin(_ c: Component, _ i: Int) -> PortRef { PortRef(comp: c.id, port: i) }
 
         mutating func wire(_ a: PortRef, _ b: PortRef) { p.wires.append(Wire(a: a, b: b)) }

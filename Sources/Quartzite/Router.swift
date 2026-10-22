@@ -21,7 +21,7 @@ struct Routing {
 
     init(project: Project, conn: Connectivity) {
         let portPoints: [(CGPoint, Int)] = project.components.flatMap { c in
-            c.kind.allPorts.indices.compactMap { i -> (CGPoint, Int)? in
+            c.portIndices.compactMap { i -> (CGPoint, Int)? in
                 guard let n = conn.netOf[PortRef(comp: c.id, port: i)] else { return nil }
                 return (c.portPoint(i), n)
             }
@@ -125,7 +125,7 @@ struct Routing {
     /// Candidate routes between two ports, taking each symbol's rotation into account.
     static func candidates(_ ca: Component, _ pa: Int, _ cb: Component, _ pb: Int) -> [[CGPoint]] {
         let s = ca.portPoint(pa), t = cb.portPoint(pb)
-        let sOut = ca.kind.isOutputPort(pa), tOut = cb.kind.isOutputPort(pb)
+        let sOut = ca.isOutputPort(pa), tOut = cb.isOutputPort(pb)
         let ds = ca.portDirection(pa), dt = cb.portDirection(pb)
         let around = ca.frame.union(cb.frame)
         // Unrotated symbols keep the original, hand-tuned left-to-right routes.

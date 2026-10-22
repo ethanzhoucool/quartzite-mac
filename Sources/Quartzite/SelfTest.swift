@@ -86,6 +86,7 @@ enum SelfTest {
         check(conflicts == 0, "no segments of different nets touch")
 
         CompilerSelfTest.run(check)
+        HierarchySelfTest.run(check)
         SOFSelfTest.run(check)
         HardwareSelfTest.run(check)
 
@@ -179,7 +180,7 @@ enum SelfTest {
         save("waveform.png", WaveformSnapshot(sim: sim, project: p.entityName))
         save("kmap.png", KMapView(sim: sim, output: 0).padding().background(Color.white).environment(\.colorScheme, .light))
         save("truth.png", TruthTableView(sim: sim).padding().background(Color.white).environment(\.colorScheme, .light))
-        save("icons.png", HStack { ForEach(GateKind.allCases) { GateIcon(kind: $0).frame(width: 50, height: 30) } }
+        save("icons.png", HStack { ForEach(GateKind.placeable) { GateIcon(kind: $0).frame(width: 50, height: 30) } }
             .padding().background(Color.white).environment(\.colorScheme, .light))
     }
     /// Schematic and waveform images for a saved project (used for lab hand-ins).

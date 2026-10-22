@@ -271,7 +271,7 @@ struct SymbolPropertiesSheet: View {
                     Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
                         GridRow {
                             Text("Symbol name:")
-                            Text(c?.kind.bdfName.lowercased() ?? "").monospaced()
+                            Text(c?.symbolName.lowercased() ?? "").monospaced()
                         }
                         GridRow {
                             Text("Instance name:")
@@ -292,10 +292,10 @@ struct SymbolPropertiesSheet: View {
                             Text("Type").font(.caption).foregroundStyle(.secondary)
                             Text("Node name").font(.caption).foregroundStyle(.secondary)
                         }
-                        ForEach(c.kind.allPorts.indices, id: \.self) { i in
+                        ForEach(c.portIndices, id: \.self) { i in
                             GridRow {
-                                Text(c.kind.portName(i)).monospaced()
-                                Text(c.kind.isOutputPort(i) ? "output" : "input")
+                                Text(c.portName(i)).monospaced()
+                                Text(c.isOutputPort(i) ? "output" : "input")
                                 TextField("unnamed", text: binding(i)).textFieldStyle(.roundedBorder).monospaced()
                             }
                         }
@@ -306,7 +306,7 @@ struct SymbolPropertiesSheet: View {
         .frame(width: 440)
         .onAppear {
             name = c?.name ?? ""
-            if let c { portNames = c.kind.allPorts.indices.map { store.project.labels[PortRef(comp: id, port: $0).key] ?? "" } }
+            if let c { portNames = c.portIndices.map { store.project.labels[PortRef(comp: id, port: $0).key] ?? "" } }
             nameFocused = true
         }
     }

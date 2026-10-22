@@ -153,7 +153,7 @@ struct InspectorView: View {
             HStack(spacing: 8) {
                 GateIcon(kind: c.kind).frame(width: 40, height: 24)
                 VStack(alignment: .leading) {
-                    Text(c.kind.isPin ? (c.kind == .input ? "Input pin" : "Output pin") : c.kind.bdfName.lowercased())
+                    Text(c.kind.isPin ? (c.kind == .input ? "Input pin" : "Output pin") : c.symbolName.lowercased())
                         .font(.headline)
                     Text(c.kind.isPin ? "primitives > pin" : "primitives > logic").font(.caption).foregroundStyle(.secondary)
                 }
@@ -172,10 +172,10 @@ struct InspectorView: View {
                     Text("Port names").font(.subheadline.weight(.semibold))
                     Text("Name a port to connect it to every pin or wire with the same name.")
                         .font(.caption).foregroundStyle(.secondary)
-                    ForEach(c.kind.allPorts.indices, id: \.self) { i in
+                    ForEach(c.portIndices, id: \.self) { i in
                         let ref = PortRef(comp: c.id, port: i)
                         HStack {
-                            Text(c.kind.portName(i)).monospaced().frame(width: 34, alignment: .leading)
+                            Text(c.portName(i)).monospaced().frame(width: 34, alignment: .leading)
                             TextField("unnamed", text: Binding(get: { store.project.labels[ref.key] ?? "" },
                                                                set: { store.setLabel(ref, $0) }))
                                 .textFieldStyle(.roundedBorder)
@@ -211,7 +211,7 @@ struct InspectorView: View {
         let c = store.project.component(ref.comp)
         return VStack(alignment: .leading, spacing: 8) {
             Text("Node").font(.headline)
-            Text("Named \(store.project.label(ref) ?? "") on \(c.map { "\($0.name).\($0.kind.portName(ref.port))" } ?? "a port")")
+            Text("Named \(store.project.label(ref) ?? "") on \(c.map { "\($0.name).\($0.portName(ref.port))" } ?? "a port")")
                 .font(.callout)
             Text("Every node and pin with the same name is connected, just like in Quartus.")
                 .font(.caption).foregroundStyle(.secondary)
@@ -225,7 +225,7 @@ struct InspectorView: View {
     private func wireInspector(_ w: Wire) -> some View {
         func describe(_ r: PortRef) -> String {
             guard let c = store.project.component(r.comp) else { return "?" }
-            return c.kind.isPin ? "pin \(c.name)" : "\(c.name).\(c.kind.portName(r.port))"
+            return c.kind.isPin ? "pin \(c.name)" : "\(c.name).\(c.portName(r.port))"
         }
         return VStack(alignment: .leading, spacing: 8) {
             Text("Node").font(.headline)

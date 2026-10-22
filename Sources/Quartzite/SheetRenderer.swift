@@ -121,6 +121,20 @@ struct SheetRenderer {
         case .output:
             caption(&ctx, "OUTPUT", Caption.pinDirectionRect(k), c, size: 6, color: purple)
             caption(&ctx, c.name, Caption.pinNameRect(k, c.name), c, size: 8.5, color: ink)
+        case .block, .macro, .vcc, .gnd:
+            // Texts at the places the symbol's (text ...) entries give.
+            if let sym = c.symbol ?? c.builtinSymbol {
+                caption(&ctx, sym.nameText.text, sym.nameText.cgRect, c, size: CGFloat(sym.nameText.size ?? 8), color: ink)
+                if !sym.instanceText.invisible {
+                    caption(&ctx, c.name, sym.instanceText(for: c.name).cgRect, c, size: CGFloat(sym.instanceText.size ?? 8), color: purple)
+                }
+                for p in sym.ports where !p.text2.invisible {
+                    caption(&ctx, p.text2.text, p.text2.cgRect, c, size: CGFloat(p.text2.size ?? 8), color: ink)
+                }
+                for case .text(let t) in sym.drawing where !t.invisible {
+                    caption(&ctx, t.text, t.cgRect, c, size: CGFloat(t.size ?? 8), color: ink)
+                }
+            }
         default:
             caption(&ctx, k.bdfName, Caption.typeRect(k), c, size: 6, color: purple)
             caption(&ctx, c.name, Caption.instanceRect(k, c.name), c, size: 8, color: purple, bottom: true)
@@ -141,7 +155,7 @@ struct SheetRenderer {
         }
 
         if let conn, !options.print {
-            for i in k.allPorts.indices where !k.isOutputPort(i) && !k.isPin {
+            for i in c.portIndices where !c.isOutputPort(i) && !k.isPin {
                 let ref = PortRef(comp: c.id, port: i)
                 let linked = conn.netOf[ref].map { conn.nets[$0].hasExplicitLink } ?? false
                 if !linked {
@@ -151,7 +165,7 @@ struct SheetRenderer {
                 }
             }
         }
-        if let h = options.hoverPort, h.comp == c.id, h.port < k.allPorts.count {
+        if let h = options.hoverPort, h.comp == c.id, h.port < c.portCount {
             let p = c.portPoint(h.port)
             let r = CGRect(x: p.x - 4, y: p.y - 4, width: 8, height: 8)
             ctx.fill(Path(ellipseIn: r), with: .color(Theme.qSelect.opacity(0.25)))

@@ -125,7 +125,7 @@ extension Store {
     /// "inst3.IN1" for a gate port, "pin w" for a pin.
     func describe(_ ref: PortRef) -> String {
         guard let c = project.component(ref.comp) else { return "this port" }
-        return c.kind.isPin ? "pin \(c.name)" : "\(c.name).\(c.kind.portName(ref.port))"
+        return c.kind.isPin ? "pin \(c.name)" : "\(c.name).\(c.portName(ref.port))"
     }
 
     func editNode(_ ref: PortRef, typed: String? = nil) {
@@ -154,7 +154,7 @@ extension Store {
         guard !q.isEmpty else { return [] }
         func hit(_ s: String) -> Bool { s.localizedCaseInsensitiveContains(q) }
         var found = Set<Selection>()
-        for c in project.components where hit(c.name) || hit(c.kind.bdfName) { found.insert(.comp(c.id)) }
+        for c in project.components where hit(c.name) || hit(c.symbolName) { found.insert(.comp(c.id)) }
         for (key, name) in project.labels where hit(name) {
             let parts = key.split(separator: "#")
             if parts.count == 2, let u = UUID(uuidString: String(parts[0])), let i = Int(parts[1]) {

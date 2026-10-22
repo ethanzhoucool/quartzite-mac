@@ -161,6 +161,7 @@ enum Synthesizer {
         }
         let zero = TruthTable(n: n)
         for g in c.gateOrder {
+            assert(!g.kind.isHierarchical, "blocks and macros are flattened before synthesis")
             let ins = (0..<g.kind.arity).map { i -> TruthTable in
                 guard let net = c.conn.netOf[PortRef(comp: g.id, port: i)] else { return zero }
                 return t[net] ?? zero
@@ -177,6 +178,8 @@ enum Synthesizer {
                 for m in 0..<x.size { x[m] = ins.filter { $0[m] }.count % 2 == 1 }
                 r = g.kind.family == .xor ? x : !x
             case .pinIn, .pinOut: r = ins.first ?? zero
+            case .vcc: r = !zero
+            case .gnd, .symbol: r = zero
             }
             if let net = c.conn.netOf[PortRef(comp: g.id, port: g.kind.arity)] { t[net] = r }
         }

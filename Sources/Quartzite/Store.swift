@@ -245,7 +245,7 @@ final class Store {
         guard a != b else { return }
         if project.wires.contains(where: { ($0.a == a && $0.b == b) || ($0.a == b && $0.b == a) }) { return }
         // Store the driver first so routing starts at outputs.
-        let aOut = project.component(a.comp)?.kind.isOutputPort(a.port) ?? false
+        let aOut = project.component(a.comp)?.isOutputPort(a.port) ?? false
         let wire = aOut ? Wire(a: a, b: b) : Wire(a: b, b: a)
         mutate { $0.wires.append(wire) }
     }
