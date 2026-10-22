@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
-# Build the open-source Cyclone V toolchain (Mistral + nextpnr-mistral) on
-# Apple Silicon macOS with Homebrew. Idempotent: re-running skips work that is
-# already done. Nothing outside $TOOLCHAIN is modified except Homebrew
-# formulae (cmake boost eigen xz yosys ninja, python3 if missing). No sudo.
+# Build the open-source Cyclone V toolchain (Mistral + nextpnr-mistral) and the
+# openFPGALoader JTAG programmer on Apple Silicon macOS with Homebrew.
+# Idempotent: re-running skips work that is already done. Nothing outside
+# $TOOLCHAIN is modified except Homebrew formulae (cmake boost eigen xz yosys
+# ninja libusb libftdi pkgconf, python3 if missing). No sudo.
 #
 # Result:
 #   $TOOLCHAIN/prefix/bin/nextpnr-mistral            place & route + .rbf writer
 #   $TOOLCHAIN/prefix/bin/mistral-cv                 Mistral master: decomp/comp/diff
 #   $TOOLCHAIN/prefix/bin/mistral-cv-nextpnr-latest  same tool from the branch nextpnr links
+#   $TOOLCHAIN/prefix/bin/openFPGALoader             JTAG programmer (Tools > Programmer)
 #
 # env: TOOLCHAIN (default ~/.quartzite/toolchain), JOBS, SKIP_BREW=1,
-#      MISTRAL_COMMIT, MISTRAL_NEXTPNR_COMMIT, NEXTPNR_COMMIT (pins below).
+#      SKIP_OPENFPGALOADER=1 (programmer not needed),
+#      MISTRAL_COMMIT, MISTRAL_NEXTPNR_COMMIT, NEXTPNR_COMMIT,
+#      OPENFPGALOADER_COMMIT (pins below).
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -23,6 +27,8 @@ BREW_PREFIX=$(brew --prefix 2>/dev/null || echo /opt/homebrew)
 MISTRAL_COMMIT=${MISTRAL_COMMIT:-d509238a203aadbb76291ab06543a401df91cf54}         # master
 MISTRAL_NEXTPNR_COMMIT=${MISTRAL_NEXTPNR_COMMIT:-6a97d3e}                         # origin/nextpnr-latest
 NEXTPNR_COMMIT=${NEXTPNR_COMMIT:-f7455496240cee1a5a6de262be5bdb1d1e7a3911}         # master
+# Verified on 2026-10-22 (see docs/PROGRAMMER.md): v1.2.0 plus later master commits
+OPENFPGALOADER_COMMIT=${OPENFPGALOADER_COMMIT:-26f96b4294b83108ee66fbfbe4d73bc35d9634a8}  # master
 
 log() { printf '\n==> %s\n' "$*"; }
 mkdir -p "$TOOLCHAIN/logs" "$TOOLCHAIN/prefix/bin"
@@ -32,7 +38,9 @@ cd "$TOOLCHAIN"
 # 1. Homebrew formulae ---------------------------------------------------------
 if [[ -z ${SKIP_BREW:-} ]]; then
   need=()
-  for f in cmake boost eigen xz yosys ninja; do
+  formulae=(cmake boost eigen xz yosys ninja)
+  [[ -n ${SKIP_OPENFPGALOADER:-} ]] || formulae+=(libusb libftdi pkgconf)
+  for f in "${formulae[@]}"; do
     brew list --versions "$f" >/dev/null 2>&1 || need+=("$f")
   done
   command -v python3 >/dev/null || need+=(python@3)
@@ -53,6 +61,7 @@ clone() { # url dir commit
 }
 clone https://github.com/Ravenslofty/mistral mistral "$MISTRAL_COMMIT"
 clone https://github.com/YosysHQ/nextpnr nextpnr "$NEXTPNR_COMMIT"
+[[ -n ${SKIP_OPENFPGALOADER:-} ]] || clone https://github.com/trabucayre/openFPGALoader openFPGALoader "$OPENFPGALOADER_COMMIT"
 if [[ ! -e mistral-nextpnr/.git ]]; then
   log "creating mistral-nextpnr worktree at nextpnr-latest ($MISTRAL_NEXTPNR_COMMIT)"
   git -C mistral worktree add --detach ../mistral-nextpnr "$MISTRAL_NEXTPNR_COMMIT"
@@ -106,7 +115,18 @@ build nextpnr nextpnr build-nextpnr nextpnr-mistral \
   -DBUILD_GUI=OFF -DBUILD_PYTHON=OFF -DCMAKE_INSTALL_PREFIX="$TOOLCHAIN/prefix"
 install -m755 build-nextpnr/nextpnr-mistral prefix/bin/nextpnr-mistral
 
+# 6. openFPGALoader (USB-Blaster / USB-Blaster II JTAG programmer) --------------
+# CMSIS-DAP v1 needs hidapi, which the DE10-Standard does not use.
+if [[ -z ${SKIP_OPENFPGALOADER:-} ]]; then
+  build openFPGALoader openFPGALoader build-openFPGALoader openFPGALoader -DENABLE_CMSISDAP=OFF
+  install -m755 build-openFPGALoader/openFPGALoader prefix/bin/openFPGALoader
+fi
+
 log "smoke test"
 prefix/bin/mistral-cv models | grep 5CSXFC6D6F31C6
 prefix/bin/nextpnr-mistral --version 2>&1 | head -1
+if [[ -z ${SKIP_OPENFPGALOADER:-} ]]; then
+  prefix/bin/openFPGALoader --Version
+  prefix/bin/openFPGALoader --list-cables | grep -E '^usb-blasterII '
+fi
 ls -la prefix/bin

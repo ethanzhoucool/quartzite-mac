@@ -87,7 +87,8 @@ class BuildScriptTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.dir = Path(self.tmp.name)
         self.toolchain = self.dir / "relative toolchain"
-        for repo, head in [("mistral", "master"), ("mistral-nextpnr", "old-pin"), ("nextpnr", "nextpnr")]:
+        for repo, head in [("mistral", "master"), ("mistral-nextpnr", "old-pin"), ("nextpnr", "nextpnr"),
+                           ("openFPGALoader", "ofl-pin")]:
             path = self.toolchain / repo
             (path / ".git").mkdir(parents=True)
             (path / "HEAD").write_text(head)
@@ -113,6 +114,8 @@ args=sys.argv[1:]; build=pathlib.Path(args[args.index('-B')+1]); build.mkdir(exi
 with open(os.environ['CMAKE_CALLS'], 'a') as f: f.write(str(pathlib.Path.cwd())+' '+repr(args)+'\\n')
 if build.name=='build-nextpnr':
     dest=build/'nextpnr-mistral'; text='#!/bin/sh\\necho mock-nextpnr\\n'
+elif build.name=='build-openFPGALoader':
+    dest=build/'openFPGALoader'; text='#!/bin/sh\\necho openFPGALoader v1.2.0\\necho "usb-blasterII            0x09fb:6810"\\n'
 else:
     dest=build/'mistral-cv'/'mistral-cv'; dest.parent.mkdir(exist_ok=True)
     text='#!/bin/sh\\necho 5CSXFC6D6F31C6\\n'
@@ -121,6 +124,7 @@ dest.write_text(text); dest.chmod(0o755)
         self.env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ["PATH"],
                         TOOLCHAIN=self.toolchain.name, JOBS="1", SKIP_BREW="1",
                         MISTRAL_COMMIT="master", MISTRAL_NEXTPNR_COMMIT="new-pin", NEXTPNR_COMMIT="nextpnr",
+                        OPENFPGALOADER_COMMIT="ofl-pin",
                         CMAKE_CALLS=str(self.dir / "cmake-calls"))
 
     def tool(self, name, body):
@@ -139,8 +143,17 @@ dest.write_text(text); dest.chmod(0o755)
         calls = (self.dir / "cmake-calls").read_text()
         self.assertIn("-DMISTRAL_ROOT=" + str((self.toolchain / "mistral-nextpnr").resolve()), calls)
         self.assertTrue((self.toolchain / "prefix/bin/nextpnr-mistral").is_file())
+        self.assertTrue((self.toolchain / "prefix/bin/openFPGALoader").is_file())
+        self.assertIn("-DENABLE_CMSISDAP=OFF", calls)
         self.assertEqual(self.run_build().returncode, 0)
-        self.assertEqual(len((self.dir / "cmake-calls").read_text().splitlines()), 6)
+        self.assertEqual(len((self.dir / "cmake-calls").read_text().splitlines()), 8)
+
+    def test_skip_openfpgaloader(self):
+        self.env["SKIP_OPENFPGALOADER"] = "1"
+        result = self.run_build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("openFPGALoader", (self.dir / "cmake-calls").read_text())
+        self.assertFalse((self.toolchain / "prefix/bin/openFPGALoader").exists())
 
     def test_existing_worktree_with_staged_changes_refuses_new_pin(self):
         (self.toolchain / "mistral-nextpnr/dirty").write_text("staged edit")
