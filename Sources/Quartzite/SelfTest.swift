@@ -183,13 +183,14 @@ enum SelfTest {
         save("icons.png", HStack { ForEach(GateKind.placeable) { GateIcon(kind: $0).frame(width: 50, height: 30) } }
             .padding().background(Color.white).environment(\.colorScheme, .light))
     }
-    /// Schematic and waveform images for a saved project (used for lab hand-ins).
+    /// Schematic and waveform images for a saved project's top-level sheet (used for lab hand-ins).
     @MainActor
-    static func renderProject(_ p: Project, to dir: URL) -> Bool {
+    static func renderProject(_ d: DesignProject, to dir: URL) -> Bool {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        guard let p = d.top else { print("design has no top-level sheet"); return false }
         let store = Store(persist: false)
-        store.project = p
-        guard let circuit = Compiler.compile(p).0 else { print("design has errors"); return false }
+        store.loadDesign(d, from: nil, dirty: false)
+        guard let circuit = Compiler.compile(d).0 else { print("design has errors"); return false }
         guard let sim = try? SimulationResult.run(circuit, project: p) else { print("simulation failed"); return false }
         func save(_ name: String, _ v: some View) -> Bool {
             let r = ImageRenderer(content: v)

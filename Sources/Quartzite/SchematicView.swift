@@ -67,7 +67,8 @@ struct CanvasStatusBar: View {
         case .hand: return "Drag to move the sheet."
         case .text: return "Click to type text on the sheet. Click existing text to edit it."
         case .node: return "Drag from a port to another port, a node, or empty space (then name the node). Esc returns to the Selection Tool."
-        case .place(let k): return "Click to place \(k.isPin ? k.displayName.lowercased() : k.bdfName.lowercased()). Esc returns to the Selection Tool."
+        case .place(.primitive(let k)) where k.isPin: return "Click to place \(k.displayName.lowercased()). Esc returns to the Selection Tool."
+        case .place(let item): return "Click to place \(item.title). Esc returns to the Selection Tool."
         }
     }
 }
@@ -151,11 +152,12 @@ struct InspectorView: View {
     private func componentInspector(_ c: Component) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                GateIcon(kind: c.kind).frame(width: 40, height: 24)
+                GateIcon(kind: c.kind, primitive: c.primitive).frame(width: 40, height: 24)
                 VStack(alignment: .leading) {
-                    Text(c.kind.isPin ? (c.kind == .input ? "Input pin" : "Output pin") : c.symbolName.lowercased())
+                    Text(c.kind.isPin ? (c.kind == .input ? "Input pin" : "Output pin")
+                         : (c.kind == .block ? c.symbolName : c.symbolName.lowercased()))
                         .font(.headline)
-                    Text(c.kind.isPin ? "primitives > pin" : "primitives > logic").font(.caption).foregroundStyle(.secondary)
+                    Text(libraryPath(c)).font(.caption).foregroundStyle(.secondary)
                 }
             }
             VStack(alignment: .leading, spacing: 4) {
@@ -165,14 +167,30 @@ struct InspectorView: View {
                     .textFieldStyle(.roundedBorder)
             }
             orientationControls
+            if c.kind == .block {
+                Button("Open \(c.symbolName).bdf") { store.openBlock(c.id) }
+                    .disabled(store.design.sheet(named: c.symbolName) == nil)
+                    .help("Open Design File (or double-click the block)")
+            } else if c.kind == .macro {
+                Button("Function Table...") { store.sheet = .macroInfo(c.id) }
+                    .help("What the macro does (or double-click it)")
+            }
             if c.kind.isPin {
-                PinLocationPicker(store: store, pin: c)
+                if store.isTopSheet {
+                    PinLocationPicker(store: store, pin: c)
+                } else {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Location").font(.caption).foregroundStyle(.secondary)
+                        Text("Only top-level pins get locations").font(.callout).foregroundStyle(.secondary)
+                            .help("\(store.project.entityName) is a block. Its pins are the block's ports; assign locations to the pins of \(store.design.topLevelEntity).bdf.")
+                    }
+                }
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Port names").font(.subheadline.weight(.semibold))
                     Text("Name a port to connect it to every pin or wire with the same name.")
                         .font(.caption).foregroundStyle(.secondary)
-                    ForEach(c.portIndices, id: \.self) { i in
+                    ForEach(c.displayedPortIndices, id: \.self) { i in
                         let ref = PortRef(comp: c.id, port: i)
                         HStack {
                             Text(c.portName(i)).monospaced().frame(width: 34, alignment: .leading)
@@ -187,6 +205,16 @@ struct InspectorView: View {
         }
     }
 
+    /// Where the symbol comes from in the Symbol dialog: "Project > HA", "others > maxplus2 > 7447".
+    private func libraryPath(_ c: Component) -> String {
+        if c.kind.isPin { return "primitives > pin" }
+        if let s = c.symbol ?? c.builtinSymbol {
+            if s.source == .project { return "Project > \(s.name)" }
+            return ((s.libraryPath ?? []) + [s.name.lowercased()]).joined(separator: " > ")
+        }
+        return "primitives > logic"
+    }
+
     /// Rotate / flip buttons, matching the toolbar's Flip Horizontal, Flip Vertical and Rotate Left 90.
     private var orientationControls: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -198,7 +226,8 @@ struct InspectorView: View {
                          (.flipx, "arrow.up.and.down.righttriangle.up.righttriangle.down", "Flip Vertical")], id: \.0) { op, icon, name in
                     Button { store.apply(op) } label: { Image(systemName: icon) }
                         .disabled(!store.canApply(op))
-                        .help(store.canApply(op) ? name : "\(name) is not available: Quartus can't store a quarter turn combined with a flip")
+                        .help(store.canApply(op) ? name : store.selectionHasFixedOrientation ? Store.fixedOrientationHelp
+                              : "\(name) is not available: Quartus can't store a quarter turn combined with a flip")
                 }
                 if store.selectedComponentIDs.count == 1, let c = store.project.component(store.selectedComponentIDs[0]) {
                     Text(c.orient.title).font(.caption).foregroundStyle(.secondary)

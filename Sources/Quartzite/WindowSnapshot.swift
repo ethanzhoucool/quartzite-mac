@@ -42,15 +42,25 @@ enum WindowSnapshot {
         let statuses = FlowStage.fullCompilation.map { "\($0.toolName)=\(live.stageStatus[$0].map { "\($0)" } ?? "nil")" }
         print("live run: sawRunning=\(sawRunning) finished=\(!live.isProcessing) tab=\(live.tab) \(statuses.joined(separator: ", "))")
         print("live run last message: \(live.messages.last?.text ?? "")")
-        let shots: [(String, DocTab, String?)] = [
+        var shots: [(String, DocTab, String?)] = [
             ("window_bdf", .bdf, nil), ("window_report_summary", .report, "flow.summary"),
             ("window_report_equations", .report, "stage.analysisSynthesis.equations"),
             ("window_report_pinout", .report, "stage.fitter.pinout"), ("window_report_netlist", .report, "stage.eda.netlist"),
             ("window_pins", .pins, nil), ("window_assignments", .assignments, nil), ("window_waveform", .waveform, nil),
         ]
+        // Multi-file designs: a selected block and macro on the top sheet, then the block's own sheet.
+        let top = d.top?.components ?? []
+        let block = top.first { $0.kind == .block }, macro = top.first { $0.kind == .macro }
+        if macro != nil { shots.append(("window_bdf_macro", .bdf, "macro")) }
+        if block != nil { shots += [("window_bdf_block", .bdf, "block"), ("window_bdf_child", .bdf, "child")] }
         for (name, tab, sel) in shots {
             store.tab = tab
-            if let sel { store.reportSelection = sel }
+            switch (tab, sel) {
+            case (.bdf, "macro"?): store.selection = [.comp(macro!.id)]
+            case (.bdf, "block"?): store.selection = [.comp(block!.id)]
+            case (.bdf, "child"?): store.openBlock(block!.id)
+            default: if let sel { store.reportSelection = sel }
+            }
             if tab == .waveform { store.simulate() }
             let host = NSHostingView(rootView: ContentView(store: store).frame(width: 1440, height: 900))
             host.frame = NSRect(x: 0, y: 0, width: 1440, height: 900)
@@ -67,6 +77,14 @@ enum WindowSnapshot {
                 } catch { print("Could not write snapshot: \(error.localizedDescription)"); ok = false }
             } else { ok = false }
             window.close()
+        }
+        // Dialogs of multi-file designs: Insert Symbol on the block's sheet, the macro's function table.
+        if block != nil {
+            ok = render(PropertySheetView(store: store, sheet: .symbolLibrary(at: .zero)).background(.background), "dialog_symbol", dir) && ok
+        }
+        if let macro, let top = d.top?.id {
+            store.openSheet(top)
+            ok = render(PropertySheetView(store: store, sheet: .macroInfo(macro.id)).background(.background), "dialog_macro", dir) && ok
         }
         return ok
     }

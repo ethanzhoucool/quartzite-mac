@@ -18,6 +18,7 @@ struct PropertySheetView: View {
         case .newFile: NewFileSheet(store: store)
         case .renameSheet(let id): RenameSheetSheet(store: store, id: id)
         case .updateSymbol: UpdateSymbolSheet(store: store)
+        case .macroInfo(let id): MacroInfoSheet(store: store, id: id)
         }
     }
 }
@@ -47,19 +48,28 @@ private struct SheetFrame<Content: View>: View {
 
 // MARK: - Symbol library (Quartus: Edit > Insert Symbol)
 
-/// Quartus' "Symbol" window: a Libraries tree, the Name field, Repeat-insert mode,
-/// and a preview on a dotted sheet.
+/// Quartus' "Symbol" window: a Libraries tree (the project's own symbols, others >
+/// maxplus2, primitives), the Name field, Repeat-insert mode, and a preview on a dotted sheet.
 @MainActor
 struct SymbolLibrarySheet: View {
     @Bindable var store: Store
     var insertAt: CGPoint?
     @State private var name = ""
-    @State private var selected: GateKind? = .and2
+    @State private var selected: PlaceItem? = .primitive(.and2)
+    @State private var projectOpen = true
+    @State private var othersOpen = true
+    @State private var maxplusOpen = true
     @State private var logicOpen = true
+    @State private var otherOpen = true
     @State private var pinOpen = true
     @FocusState private var nameFocused: Bool
 
     private var logic: [GateKind] { GateKind.gates.sorted { $0.bdfName.lowercased() < $1.bdfName.lowercased() } }
+
+    /// Sheets with a symbol (.bsf). The open sheet and sheets that contain it can't be placed.
+    private var projectSymbols: [Project] {
+        store.design.sheets.filter { $0.symbol != nil }.sorted { $0.entityName.lowercased() < $1.entityName.lowercased() }
+    }
 
     var body: some View {
         SheetFrame(title: "Symbol", okDisabled: resolved == nil, onOK: insert, onCancel: { store.sheet = nil }) {
@@ -67,46 +77,74 @@ struct SymbolLibrarySheet: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Libraries:")
                     List(selection: $selected) {
+                        DisclosureGroup(isExpanded: $projectOpen) {
+                            if projectSymbols.isEmpty {
+                                Text("No symbols yet")
+                                    .foregroundStyle(.tertiary)
+                                    .help("Open a file and use File > Create/Update > Create Symbol Files for Current File to place it here")
+                            }
+                            ForEach(projectSymbols, id: \.id) { s in
+                                let item = PlaceItem.block(s.entityName)
+                                let problem = store.placementProblem(item)
+                                Label(s.entityName, systemImage: "square.on.square")
+                                    .foregroundStyle(problem == nil ? .primary : .tertiary)
+                                    .tag(item)
+                                    .selectionDisabled(problem != nil)
+                                    .help(problem ?? "\(s.entityName).bsf, from \(s.entityName).bdf")
+                            }
+                        } label: { Label("Project", systemImage: "folder") }
                         DisclosureGroup(isExpanded: .constant(true)) {
+                            DisclosureGroup(isExpanded: $othersOpen) {
+                                DisclosureGroup(isExpanded: $maxplusOpen) {
+                                    ForEach(MacroLibrary.all.filter { $0.library == ["others", "maxplus2"] }, id: \.name) { m in
+                                        Label(m.name, systemImage: "memorychip").tag(PlaceItem.macro(m.name)).help(m.description)
+                                    }
+                                } label: { Label("maxplus2", systemImage: "folder") }
+                            } label: { Label("others", systemImage: "folder") }
                             DisclosureGroup(isExpanded: .constant(true)) {
                                 DisclosureGroup(isExpanded: $logicOpen) {
                                     ForEach(logic) { k in
-                                        Label(k.bdfName.lowercased(), systemImage: "square.on.square.dashed").tag(k)
+                                        Label(k.bdfName.lowercased(), systemImage: "square.on.square.dashed").tag(PlaceItem.primitive(k))
                                     }
                                 } label: { Label("logic", systemImage: "folder") }
+                                DisclosureGroup(isExpanded: $otherOpen) {
+                                    Label("gnd", systemImage: "square.on.square.dashed").tag(PlaceItem.primitive(.gnd))
+                                    Label("vcc", systemImage: "square.on.square.dashed").tag(PlaceItem.primitive(.vcc))
+                                } label: { Label("other", systemImage: "folder") }
                                 DisclosureGroup(isExpanded: $pinOpen) {
                                     Label("bidir", systemImage: "square.on.square.dashed")
                                         .foregroundStyle(.tertiary)
                                         .help("Bidirectional pins are not supported yet")
-                                    Label("input", systemImage: "square.on.square.dashed").tag(GateKind.input)
-                                    Label("output", systemImage: "square.on.square.dashed").tag(GateKind.output)
+                                    Label("input", systemImage: "square.on.square.dashed").tag(PlaceItem.primitive(.input))
+                                    Label("output", systemImage: "square.on.square.dashed").tag(PlaceItem.primitive(.output))
                                 } label: { Label("pin", systemImage: "folder") }
                             } label: { Label("primitives", systemImage: "folder") }
                         } label: { Label("libraries/", systemImage: "folder") }
                     }
                     .frame(width: 220, height: 280)
-                    .onChange(of: selected) { _, k in if let k { name = symbolName(k) } }
+                    .onChange(of: selected) { _, item in if let item { name = item.title } }
                     Text("Name:")
                     TextField("", text: $name)
                         .textFieldStyle(.roundedBorder)
                         .focused($nameFocused)
                         .onSubmit { if resolved != nil { insert() } }
-                        .onChange(of: name) { _, v in if let k = lookup(v) { selected = k } }
+                        .onChange(of: name) { _, v in
+                            if let item = lookup(v), store.placementProblem(item) == nil, item != selected { selected = item }
+                        }
                     Toggle("Repeat-insert mode", isOn: $store.repeatInsert).toggleStyle(.checkbox)
                     Toggle("Insert symbol as block", isOn: .constant(false))
                         .toggleStyle(.checkbox)
                         .disabled(true)
-                        .help("Blocks are not supported yet")
+                        .help("Project symbols are placed as blocks already; Block Tool blocks are not supported yet")
                 }
                 ZStack {
                     Rectangle().fill(Theme.paper)
                     Canvas { ctx, size in
                         SheetRenderer.drawGrid(&ctx, size: size, zoom: 1.5)
-                        guard let k = resolved else { return }
-                        let s = k.size
-                        let z: CGFloat = min(2, (size.width - 40) / s.width)
-                        let c = Component(kind: k, name: k.isPin ? (k == .input ? "pin_name" : "pin_name") : "inst",
-                                          x: 0, y: 0)
+                        guard let item = lookup(name), var c = item.component(in: store.design, x: 0, y: 0) else { return }
+                        c.name = item.isPin ? "pin_name" : "inst"
+                        let s = c.librarySize
+                        let z: CGFloat = min(2, (size.width - 40) / s.width, (size.height - 40) / s.height)
                         ctx.translateBy(x: Routing.snap((size.width - s.width * z) / 2), y: Routing.snap((size.height - s.height * z) / 2))
                         ctx.scaleBy(x: z, y: z)
                         var o = SheetRenderer.Options()
@@ -115,8 +153,12 @@ struct SymbolLibrarySheet: View {
                         SheetRenderer(project: Project(), routing: Routing(project: Project(), conn: Connectivity(Project())), options: o)
                             .drawSymbol(&ctx, c, selected: false, conn: nil)
                     }
-                    if resolved == nil {
-                        Text("No symbol named \(name)").font(.callout).foregroundStyle(.secondary)
+                    if let message {
+                        Text(message).font(.callout).foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(12)
+                            .background(Theme.paper.opacity(0.9))
+                            .frame(maxHeight: .infinity, alignment: .bottom)
                     }
                 }
                 .overlay(Rectangle().strokeBorder(.separator))
@@ -126,30 +168,41 @@ struct SymbolLibrarySheet: View {
         }
         .frame(width: 600)
         .onAppear {
-            name = symbolName(selected ?? .and2)
+            name = (selected ?? .primitive(.and2)).title
             nameFocused = true
         }
     }
 
-    private func symbolName(_ k: GateKind) -> String { k.isPin ? k.rawValue : k.bdfName.lowercased() }
-
-    private func lookup(_ s: String) -> GateKind? {
-        let t = s.trimmingCharacters(in: .whitespaces).lowercased()
-        if t == "input" { return .input }
-        if t == "output" { return .output }
-        return GateKind.gates.first { $0.bdfName.lowercased() == t || $0.rawValue == t }
+    /// What the Name field names: a primitive, a library macro, or a file of the project.
+    private func lookup(_ s: String) -> PlaceItem? {
+        let t = s.trimmingCharacters(in: .whitespaces)
+        let l = t.lowercased()
+        if let k = ([GateKind.input, .output, .vcc, .gnd] + GateKind.gates).first(where: { $0.rawValue == l || $0.bdfName.lowercased() == l }) {
+            return .primitive(k)
+        }
+        if let m = MacroLibrary.named(t) { return .macro(m.name) }
+        if let sheet = store.design.sheet(named: t) { return .block(sheet.entityName) }
+        return nil
     }
 
-    private var resolved: GateKind? { lookup(name) }
+    private var resolved: PlaceItem? {
+        guard let item = lookup(name), store.placementProblem(item) == nil else { return nil }
+        return item
+    }
+
+    private var message: String? {
+        guard let item = lookup(name) else { return "No symbol named \(name)" }
+        return store.placementProblem(item)
+    }
 
     private func insert() {
-        guard let k = resolved else { return }
+        guard let item = resolved else { return }
         store.sheet = nil
         if let p = insertAt {
-            store.place(k, at: p)
-            if store.repeatInsert { store.tool = .place(k) }
+            store.place(item, at: p)
+            if store.repeatInsert { store.tool = .place(item) }
         } else {
-            store.tool = .place(k)
+            store.tool = .place(item)
         }
         store.tab = .bdf
     }
@@ -216,17 +269,24 @@ struct PinPropertiesSheet: View {
                             .help("The value Quartus uses when this pin is left unconnected in a higher-level design")
                         }
                     }
-                    GridRow {
-                        Text("Location:")
-                        Picker("", selection: $location) {
-                            Text("Not assigned").tag("")
-                            ForEach(BoardPin.de10Standard.filter { $0.isInput == (pin?.kind == .input) }) {
-                                Text("\($0.label)  (\($0.pin))").tag($0.pin)
-                            }
-                            if !location.isEmpty && BoardPin.lookup(location) == nil { Text(location).tag(location) }
+                    if !store.isTopSheet {
+                        GridRow {
+                            Text("Location:")
+                            Text("Only top-level pins get locations").foregroundStyle(.secondary)
                         }
-                        .labelsHidden()
-                        .help("Same as the Location column in the Pin Planner")
+                    } else {
+                        GridRow {
+                            Text("Location:")
+                            Picker("", selection: $location) {
+                                Text("Not assigned").tag("")
+                                ForEach(BoardPin.de10Standard.filter { $0.isInput == (pin?.kind == .input) }) {
+                                    Text("\($0.label)  (\($0.pin))").tag($0.pin)
+                                }
+                                if !location.isEmpty && BoardPin.lookup(location) == nil { Text(location).tag(location) }
+                            }
+                            .labelsHidden()
+                            .help("Same as the Location column in the Pin Planner")
+                        }
                     }
                 }
                 if !name.isEmpty && !Compiler.isValidName(name) {
@@ -249,7 +309,7 @@ struct PinPropertiesSheet: View {
             c.name = name
             if c.kind == .input { c.defaultValue = dv == "VCC" ? nil : dv }
         }
-        store.assign(id, to: location.isEmpty ? nil : location)
+        if store.isTopSheet { store.assign(id, to: location.isEmpty ? nil : location) }
         store.sheet = nil
     }
 }
@@ -295,7 +355,7 @@ struct SymbolPropertiesSheet: View {
                             Text("Type").font(.caption).foregroundStyle(.secondary)
                             Text("Node name").font(.caption).foregroundStyle(.secondary)
                         }
-                        ForEach(c.portIndices, id: \.self) { i in
+                        ForEach(c.displayedPortIndices, id: \.self) { i in
                             GridRow {
                                 Text(c.portName(i)).monospaced()
                                 Text(c.isOutputPort(i) ? "output" : "input")
@@ -558,6 +618,75 @@ struct UpdateSymbolSheet: View {
         }
         .frame(width: 420)
         .onAppear { scope = store.selectedBlockIDs.isEmpty ? .all : .selected }
+    }
+}
+
+// MARK: - Library macro
+
+/// Double-click on a library macro: what it does and its function table (read only).
+@MainActor
+struct MacroInfoSheet: View {
+    @Bindable var store: Store
+    var id: UUID
+
+    var body: some View {
+        let c = store.project.component(id)
+        let m = c?.symbol.flatMap { MacroLibrary.named($0.name) }
+        VStack(alignment: .leading, spacing: 12) {
+            if let c, let m {
+                Text("\(m.name)  (\((m.library + [m.name]).joined(separator: " > ")))").font(.headline)
+                Text("Instance \(c.name). \(m.description)")
+                    .font(.callout).fixedSize(horizontal: false, vertical: true)
+                Text(m.unconnectedHint).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                table(m)
+            } else {
+                Text("This is not a library macro").foregroundStyle(.secondary)
+            }
+            HStack {
+                Button("Symbol Properties...") { store.sheet = .symbol(id) }
+                Spacer()
+                Button("Close") { store.sheet = nil }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 560)
+    }
+
+    /// Rows for the four data inputs (the remaining inputs at 1), then one row per remaining
+    /// input at 0 with the data inputs at 0. Values come from the macro's own function.
+    private func table(_ m: MacroDef) -> some View {
+        let data = min(4, m.inputs.count)
+        var rows: [(label: String, inputs: [Bool])] = (0..<(1 << data)).map { v in
+            ("\(v)", (0..<m.inputs.count).map { i in i < data ? (v >> i) & 1 == 1 : true })
+        }
+        for i in data..<m.inputs.count {
+            rows.append(("\(m.inputs[i])=0", (0..<m.inputs.count).map { $0 >= data && $0 != i }))
+        }
+        let columns = Array(m.inputs[..<data].reversed()) + Array(m.inputs[data...]) + m.outputs
+        return ScrollView {
+            Grid(alignment: .center, horizontalSpacing: 8, verticalSpacing: 2) {
+                GridRow {
+                    Text("").gridColumnAlignment(.leading)
+                    ForEach(columns.indices, id: \.self) { k in
+                        Text(columns[k]).fontWeight(.semibold).foregroundStyle(k < m.inputs.count ? Color.primary : Theme.accent)
+                    }
+                }
+                Divider()
+                ForEach(rows.indices, id: \.self) { r in
+                    let ins = rows[r].inputs
+                    let values = Array(ins[..<data].reversed()) + Array(ins[data...]) + m.function(ins)
+                    GridRow {
+                        Text(rows[r].label).foregroundStyle(.secondary)
+                        ForEach(values.indices, id: \.self) { k in Text(values[k] ? "1" : "0") }
+                    }
+                }
+            }
+            .font(.system(size: 11, design: .monospaced))
+            .padding(8)
+        }
+        .frame(height: 300)
+        .background(RoundedRectangle(cornerRadius: Theme.radius).fill(.background.opacity(0.6)))
+        .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(.separator))
     }
 }
 

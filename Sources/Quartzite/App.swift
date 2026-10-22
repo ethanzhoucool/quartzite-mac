@@ -97,8 +97,8 @@ struct QuartusCommands: Commands {
             Button("Update Symbol or Block...") { store.tab = .bdf; store.sheet = .updateSymbol }
                 .disabled(!store.project.components.contains { $0.kind == .block })
             Menu("Insert Pin") {
-                Button("Input") { store.tab = .bdf; store.tool = .place(.input) }
-                Button("Output") { store.tab = .bdf; store.tool = .place(.output) }
+                Button("Input") { store.tab = .bdf; store.tool = .place(.primitive(.input)) }
+                Button("Output") { store.tab = .bdf; store.tool = .place(.primitive(.output)) }
             }
         }
         CommandGroup(after: .toolbar) {

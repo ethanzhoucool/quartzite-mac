@@ -7,7 +7,53 @@ import UniformTypeIdentifiers
 /// A selected symbol/pin, wire, named node stub (a net label on a port) or free text.
 enum Selection: Hashable { case comp(UUID), wire(UUID), node(PortRef), text(UUID) }
 /// Block Editor tools, named like the Quartus toolbar buttons.
-enum Tool: Equatable { case select, zoom, hand, text, node, place(GateKind) }
+enum Tool: Equatable { case select, zoom, hand, text, node, place(PlaceItem) }
+
+/// What the Symbol Tool places: a primitive (gate, pin, VCC, GND), a block of another
+/// sheet of the project ("HA"), or a library macro ("7447").
+enum PlaceItem: Hashable {
+    case primitive(GateKind)
+    case block(String)
+    case macro(String)
+
+    /// The name Quartus' Symbol dialog shows: "and2", "input", "vcc", "HA", "7447".
+    var title: String {
+        switch self {
+        case .primitive(let k): return k.isPin || k == .vcc || k == .gnd ? k.rawValue : k.bdfName.lowercased()
+        case .block(let n), .macro(let n): return n
+        }
+    }
+
+    var isPin: Bool { if case .primitive(let k) = self { return k.isPin }; return false }
+
+    /// The symbol of a block or macro (nil for primitives and unknown names).
+    func symbol(in design: DesignProject) -> SymbolDef? {
+        switch self {
+        case .primitive(let k): return k == .vcc ? BuiltinSymbols.vcc : (k == .gnd ? BuiltinSymbols.gnd : nil)
+        case .block(let n): return design.sheet(named: n)?.symbol
+        case .macro(let n): return MacroLibrary.named(n).map(MacroLibrary.symbol)
+        }
+    }
+
+    /// Geometry for the placement ghost and the dialog preview.
+    func primitive(in design: DesignProject) -> Primitive? {
+        if case .primitive(let k) = self { return k.primitive }
+        return symbol(in: design)?.primitive
+    }
+
+    /// A new, unnamed component of this item at (x, y), or nil if the block or macro is unknown.
+    func component(in design: DesignProject, x: Int, y: Int) -> Component? {
+        switch self {
+        case .primitive(let k): return Component(kind: k, name: "", x: x, y: y)
+        case .block, .macro:
+            guard let sym = symbol(in: design) else { return nil }
+            var c = Component(kind: .macro, name: "", x: x, y: y)
+            if case .block = self { c.kind = .block }
+            c.symbol = sym
+            return c
+        }
+    }
+}
 
 /// Document tabs, named like the windows they mirror in Quartus.
 enum DocTab: String, CaseIterable, Identifiable {
@@ -49,6 +95,8 @@ enum PropertySheet: Identifiable {
     case renameSheet(UUID)
     /// Edit > Update Symbol or Block...
     case updateSymbol
+    /// Read-only description and function table of a library macro instance.
+    case macroInfo(UUID)
     var id: String {
         switch self {
         case .symbolLibrary: return "lib"
@@ -60,6 +108,7 @@ enum PropertySheet: Identifiable {
         case .newFile: return "newFile"
         case .renameSheet(let u): return "rename\(u)"
         case .updateSymbol: return "updateSymbol"
+        case .macroInfo(let u): return "macro\(u)"
         }
     }
 }
@@ -172,6 +221,9 @@ final class Store {
 
     /// The top-level entity's sheet: its pins are the design's pins.
     var topProject: Project { design.top ?? project }
+
+    /// The Block Editor shows the top-level entity (only its pins get locations).
+    var isTopSheet: Bool { design.topIndex.map { $0 == activeIndex } ?? true }
 
     static func replacingSheet(_ i: Int, with p: Project, in design: DesignProject) -> DesignProject {
         var d = design
@@ -313,14 +365,46 @@ final class Store {
 
     // MARK: - Editing
 
-    func place(_ kind: GateKind, at p: CGPoint) {
-        let size = kind.size
-        let x = Int(Routing.snap(p.x - size.width / 2)), y = Int(Routing.snap(p.y - size.height / 2))
-        var comp = Component(kind: kind, name: "", x: max(0, x), y: max(0, y))
-        comp.name = kind.isPin ? project.nextPinName(for: kind) : project.nextInstanceName()
+    func place(_ kind: GateKind, at p: CGPoint) { place(.primitive(kind), at: p) }
+
+    /// Why `item` can't be placed on the open sheet (a block that would contain itself, or
+    /// one without a symbol), or nil.
+    func placementProblem(_ item: PlaceItem) -> String? {
+        switch item {
+        case .primitive: return nil
+        case .macro(let n): return MacroLibrary.named(n) == nil ? "There is no library symbol named \(n)" : nil
+        case .block(let n):
+            let here = project.entityName
+            guard let child = design.sheet(named: n) else { return "The project has no file named \(n).bdf" }
+            if child.entityName.caseInsensitiveCompare(here) == .orderedSame {
+                return "\(here) can't contain itself"
+            }
+            if design.wouldRecurse(placing: child.entityName, into: here) {
+                return "\(child.entityName) contains \(here), so placing it in \(here).bdf would make \(here) contain itself"
+            }
+            if child.symbol == nil {
+                return "\(child.entityName) has no symbol yet. Open \(child.entityName).bdf and use File > Create/Update > Create Symbol Files for Current File."
+            }
+            return nil
+        }
+    }
+
+    /// Places `item` centred on `p` (Symbol Tool). Blocks that would make the sheet contain
+    /// itself are refused, with the reason in the status bar.
+    @discardableResult
+    func place(_ item: PlaceItem, at p: CGPoint) -> Bool {
+        if let problem = placementProblem(item) {
+            EditorState.shared.status = problem
+            return false
+        }
+        guard let prim = item.primitive(in: design) else { return false }
+        let x = Int(Routing.snap(p.x - prim.size.width / 2)), y = Int(Routing.snap(p.y - prim.size.height / 2))
+        guard var comp = item.component(in: design, x: max(0, x), y: max(0, y)) else { return false }
+        comp.name = comp.kind.isPin ? project.nextPinName(for: comp.kind) : project.nextInstanceName()
         mutate { $0.components.append(comp) }
         selection = [.comp(comp.id)]
         if !repeatInsert { tool = .select }
+        return true
     }
 
     func connect(_ a: PortRef, _ b: PortRef) {
@@ -630,10 +714,21 @@ final class Store {
         fragmentProject.labels = frag.labels
         fragmentProject.notes = frag.notes
         guard fragmentProject.structuralErrors.isEmpty else { return }
+        // A block of this sheet, or of a sheet that contains it, would make it contain itself.
+        let here = project.entityName
+        let refused = frag.components.filter { c in
+            c.kind == .block && c.symbol.map { design.wouldRecurse(placing: $0.name, into: here) } ?? false
+        }
+        if !refused.isEmpty {
+            let names = Array(Set(refused.compactMap { $0.symbol?.name })).sorted()
+            EditorState.shared.status = "Left out \(refused.count) block\(refused.count == 1 ? "" : "s") (\(names.joined(separator: ", "))) that would make \(here) contain itself"
+        }
+        let refusedIDs = Set(refused.map(\.id))
+        guard frag.components.count > refused.count || !(frag.notes ?? []).isEmpty else { return }
         var map: [UUID: UUID] = [:]
         var newSelection: Set<Selection> = []
         mutate { p in
-            for var c in frag.components {
+            for var c in frag.components where !refusedIDs.contains(c.id) {
                 let old = c.id
                 c.id = UUID()
                 map[old] = c.id

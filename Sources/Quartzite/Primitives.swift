@@ -248,6 +248,17 @@ enum Caption {
 extension Component {
     var orient: Orientation { orientation ?? .none }
 
+    /// Port indices as the symbol shows them: inputs, then outputs, each top to bottom. (A
+    /// block's or macro's file order can differ, as in Quartus' 7447.)
+    var displayedPortIndices: [Int] {
+        guard symbol != nil else { return Array(portIndices) }
+        let ports = primitive.ports
+        return portIndices.sorted { (ports[$0].isOutput ? 1 : 0, ports[$0].pt.y, $0) < (ports[$1].isOutput ? 1 : 0, ports[$1].pt.y, $1) }
+    }
+
+    /// Blocks, library macros, VCC and GND can't be rotated or flipped (yet).
+    var hasFixedOrientation: Bool { kind.isHierarchical || kind == .vcc || kind == .gnd }
+
     /// VCC and GND symbols (they have no `symbol` of their own).
     var builtinSymbol: SymbolDef? {
         switch kind {

@@ -34,11 +34,19 @@ extension Store {
 
     // MARK: Rotate / flip
 
+    static let fixedOrientationHelp = "Rotating blocks is not supported yet"
+
+    /// The selection includes a block, macro, VCC or GND, which keep their orientation.
+    var selectionHasFixedOrientation: Bool {
+        selectedComponentIDs.contains { project.component($0)?.hasFixedOrientation == true }
+    }
+
     /// Whether `op` can be applied to every selected symbol (Quartus can't store a
-    /// rotation combined with a flip, so some combinations are refused).
+    /// rotation combined with a flip, so some combinations are refused; blocks, macros,
+    /// VCC and GND are not rotated at all).
     func canApply(_ op: Orientation) -> Bool {
         let comps = selectedComponentIDs.compactMap { project.component($0) }
-        return !comps.isEmpty && comps.allSatisfy { $0.orient.then(op) != nil }
+        return !comps.isEmpty && comps.allSatisfy { !$0.hasFixedOrientation && $0.orient.then(op) != nil }
     }
 
     /// Rotates or flips each selected symbol about its own centre.

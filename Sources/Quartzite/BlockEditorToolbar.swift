@@ -72,12 +72,12 @@ struct BlockEditorToolbar: View {
     }
 
     private var isPlacingGate: Bool {
-        if case .place(let k) = store.tool { return !k.isPin }
+        if case .place(let item) = store.tool { return !item.isPin }
         return false
     }
 
     private var placingPin: GateKind? {
-        if case .place(let k) = store.tool, k.isPin { return k }
+        if case .place(.primitive(let k)) = store.tool, k.isPin { return k }
         return nil
     }
 
@@ -91,8 +91,8 @@ struct BlockEditorToolbar: View {
     /// Pin Tool with Quartus' Input / Output / Bidir choices.
     private var pinTool: some View {
         Menu {
-            Button("Input") { store.tool = .place(.input) }
-            Button("Output") { store.tool = .place(.output) }
+            Button("Input") { store.tool = .place(.primitive(.input)) }
+            Button("Output") { store.tool = .place(.primitive(.output)) }
             Button("Bidir (not supported yet)") {}.disabled(true)
         } label: {
             ToolGlyph.pin(store: placingPin ?? .input).frame(width: 24, height: 14)
@@ -110,6 +110,8 @@ struct BlockEditorToolbar: View {
         let help: String
         if store.selectedComponentIDs.isEmpty {
             help = "\(name) (select a symbol first)"
+        } else if store.selectionHasFixedOrientation {
+            help = Store.fixedOrientationHelp
         } else if !enabled {
             help = "\(name) is not available: Quartus can't store a symbol that is both rotated a quarter turn and flipped. Undo the flip or rotation first."
         } else {

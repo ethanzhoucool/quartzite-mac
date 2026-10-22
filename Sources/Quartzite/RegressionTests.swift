@@ -198,6 +198,7 @@ extension RegressionTests {
         testMultiSheetStore()
         testLegacyAutosaveRestores()
         testSheetTabsAndFileCommands()
+        testInsertSymbolRefusesRecursion()
         return failures == 0
     }
     @MainActor
@@ -425,6 +426,70 @@ extension RegressionTests {
         assertTrue(store.design.staleInstances().isEmpty, "Updating all blocks in the file updates the other one")
         assertTrue(store.project.components.filter { $0.kind == .block }.allSatisfy { $0.portIndex(named: "en") != nil },
                    "and both have the new port")
+    }
+
+    /// Insert Symbol and paste refuse blocks that would make a sheet contain itself (plan 6.3).
+    @MainActor
+    static func testInsertSymbolRefusesRecursion() {
+        let store = Store(persist: false)
+        var d = HierarchySelfTest.haFA()
+        assertNoThrow(try d.addSheet(named: "Top"), "a third sheet")
+        let top = d.sheet(named: "Top")!.id!
+        assertNoThrow(try d.placeBlock("FA", inSheet: top, x: 200, y: 100), "Top uses FA")
+        store.loadDesign(d, from: nil, dirty: false)
+        let fa = d.sheet(named: "FA")!.id!, ha = d.sheet(named: "HA")!.id!
+
+        store.openSheet(ha)
+        assertNotNil(store.placementProblem(.block("HA")), "Insert Symbol: HA can't go into HA")
+        assertNotNil(store.placementProblem(.block("FA")), "Insert Symbol: FA can't go into HA, which FA contains")
+        assertFalse(store.place(.block("FA"), at: CGPoint(x: 400, y: 400)), "placing FA in HA is refused")
+        assertTrue(EditorState.shared.status?.contains("contain itself") == true, "with the reason in the status bar")
+        assertEqual(store.project.components.count, d.sheet(named: "HA")!.components.count, "and nothing is added")
+        assertTrue(store.place(.macro("7447"), at: CGPoint(x: 600, y: 300)), "a library macro can be placed")
+        assertEqual(store.project.components.last?.symbolName, "7447", "as a 7447")
+        assertTrue(store.place(.primitive(.vcc), at: CGPoint(x: 600, y: 100)), "VCC can be placed")
+
+        store.openSheet(top)
+        store.repeatInsert = true
+        store.tool = .place(.block("HA"))
+        let before = store.project.components.count
+        assertTrue(store.place(.block("HA"), at: CGPoint(x: 500, y: 400)), "a project block can be placed")
+        assertTrue(store.place(.block("HA"), at: CGPoint(x: 500, y: 600)), "twice with repeat-insert")
+        assertEqual(store.tool, .place(.block("HA")), "and the tool stays on HA")
+        let placed = store.project.components.suffix(2)
+        assertEqual(store.project.components.count, before + 2, "two HA blocks were added")
+        assertTrue(placed.allSatisfy { $0.kind == .block && $0.symbol == store.design.sheet(named: "HA")?.symbol }, "with HA's symbol")
+        assertEqual(Set(placed.map(\.name)).count, 2, "and different instance names")
+        store.repeatInsert = false
+        store.selection = [.comp(placed.first!.id)]
+        assertFalse(store.canApply(.rotate90) || store.canApply(.flipy), "blocks can't be rotated or flipped")
+        assertTrue(store.selectionHasFixedOrientation, "and say why")
+
+        // Copy the FA block from Top and paste it into HA and into FA.
+        let faBlock = store.project.components.first { $0.symbolName == "FA" }!
+        store.selection = [.comp(faBlock.id)]
+        let fragment = store.copySelection()!
+        store.openSheet(ha)
+        let haCount = store.project.components.count
+        store.paste(fragment)
+        assertEqual(store.project.components.count, haCount, "pasting FA into HA leaves it out")
+        assertTrue(EditorState.shared.status?.contains("contain itself") == true, "and says why")
+        store.openSheet(fa)
+        let faCount = store.project.components.count
+        store.paste(fragment)
+        assertEqual(store.project.components.count, faCount, "pasting FA into FA leaves it out")
+        // A fragment with an allowed block and a gate keeps both; only the recursive block is dropped.
+        let haBlock = store.project.components.first { $0.kind == .block }!
+        let gate = store.project.components.first { $0.kind.isGate }!
+        store.selection = [.comp(haBlock.id), .comp(gate.id)]
+        let mixed = store.copySelection()!
+        store.openSheet(top)
+        let topCount = store.project.components.count
+        store.paste(mixed)
+        assertEqual(store.project.components.count, topCount + 2, "pasting HA and a gate into Top keeps both")
+        store.openSheet(ha)
+        store.paste(mixed)
+        assertEqual(store.project.components.count, haCount + 1, "pasting them into HA keeps only the gate")
     }
 
     @MainActor

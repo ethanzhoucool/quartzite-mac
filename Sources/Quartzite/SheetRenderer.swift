@@ -1,5 +1,6 @@
 #if canImport(SwiftUI)
 import SwiftUI
+import AppKit
 
 /// Draws a Block Editor sheet the way Quartus Prime does: black symbols from the
 /// library drawings, purple captions, blue/purple port leads, teal dotted symbol
@@ -26,6 +27,12 @@ struct SheetRenderer {
     private var lw: CGFloat { max(0.6, 1.0 / options.zoom) }
 
     static let arial = "Arial"
+    private static let intelClearInstalled = NSFont(name: "Intel Clear", size: 8) != nil
+
+    /// The font a symbol text asks for: Intel Clear when it is installed, Arial otherwise.
+    static func fontName(_ requested: String) -> String {
+        requested == "Intel Clear" && intelClearInstalled ? requested : arial
+    }
 
     /// Dot grid on 8-unit spacing, drawn in screen pixels (before scaling by the zoom).
     static func drawGrid(_ ctx: inout GraphicsContext, size: CGSize, zoom: CGFloat) {
@@ -124,15 +131,19 @@ struct SheetRenderer {
         case .block, .macro, .vcc, .gnd:
             // Texts at the places the symbol's (text ...) entries give.
             if let sym = c.symbol ?? c.builtinSymbol {
-                caption(&ctx, sym.nameText.text, sym.nameText.cgRect, c, size: CGFloat(sym.nameText.size ?? 8), color: ink)
+                func draw(_ t: SymText, _ s: String, _ r: CGRect, _ color: Color) {
+                    caption(&ctx, s, r, c, size: CGFloat(t.size ?? 8), color: color, font: Self.fontName(t.font))
+                }
+                draw(sym.nameText, sym.nameText.text, sym.nameText.cgRect, ink)
                 if !sym.instanceText.invisible {
-                    caption(&ctx, c.name, sym.instanceText(for: c.name).cgRect, c, size: CGFloat(sym.instanceText.size ?? 8), color: purple)
+                    let t = sym.instanceText(for: c.name)
+                    draw(t, c.name, t.cgRect, purple)
                 }
                 for p in sym.ports where !p.text2.invisible {
-                    caption(&ctx, p.text2.text, p.text2.cgRect, c, size: CGFloat(p.text2.size ?? 8), color: ink)
+                    draw(p.text2, p.text2.text, p.text2.cgRect, ink)
                 }
                 for case .text(let t) in sym.drawing where !t.invisible {
-                    caption(&ctx, t.text, t.cgRect, c, size: CGFloat(t.size ?? 8), color: ink)
+                    draw(t, t.text, t.cgRect, ink)
                 }
             }
         default:
@@ -190,10 +201,10 @@ struct SheetRenderer {
     /// A caption placed in its library text box, moved with the symbol's orientation.
     /// Quarter-turned symbols get vertical text, mirrored ones keep readable text.
     private func caption(_ ctx: inout GraphicsContext, _ s: String, _ libRect: CGRect, _ c: Component,
-                         size: CGFloat, color: Color, bottom: Bool = false) {
+                         size: CGFloat, color: Color, bottom: Bool = false, font: String = SheetRenderer.arial) {
         guard !s.isEmpty else { return }
         let r = c.toSheet(libRect)
-        let text = Text(s).font(.custom(Self.arial, size: size)).foregroundStyle(color)
+        let text = Text(s).font(.custom(font, size: size)).foregroundStyle(color)
         let o = c.orient
         if o.swapsAxes {
             var l = ctx

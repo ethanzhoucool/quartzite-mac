@@ -229,6 +229,7 @@ struct CanvasMenu {
         m.addItem(ClosureMenuItem("Delete", key: "\u{8}", modifiers: [], enabled: hasAny) { store.deleteSelected() })
         m.addItem(.separator())
 
+        let fixed = store.selectionHasFixedOrientation
         let rotate = NSMenuItem(title: "Rotate by Degrees", action: nil, keyEquivalent: "")
         let rm = NSMenu()
         rm.autoenablesItems = false
@@ -236,10 +237,27 @@ struct CanvasMenu {
         rm.addItem(ClosureMenuItem("180", enabled: store.canApply(.rotate180)) { store.apply(.rotate180) })
         rm.addItem(ClosureMenuItem("270 (Rotate Right)", enabled: store.canApply(.rotate270)) { store.apply(.rotate270) })
         rotate.submenu = rm
-        rotate.isEnabled = hasComps
+        rotate.isEnabled = hasComps && !fixed
         m.addItem(rotate)
         m.addItem(ClosureMenuItem("Flip Horizontal", enabled: store.canApply(.flipy)) { store.apply(.flipy) })
         m.addItem(ClosureMenuItem("Flip Vertical", enabled: store.canApply(.flipx)) { store.apply(.flipx) })
+        if fixed { for item in m.items.suffix(3) { item.toolTip = Store.fixedOrientationHelp } }
+        m.addItem(.separator())
+
+        // Hierarchy: open the selected block's file, go back up, refresh block symbols.
+        let block = store.selection.count == 1 ? store.selectedComponentIDs.first.flatMap { store.project.component($0) } : nil
+        let openable = block.map { $0.kind == .block && store.design.sheet(named: $0.symbolName) != nil } ?? false
+        m.addItem(ClosureMenuItem("Open Design File", enabled: openable) { if let block { store.openBlock(block.id) } })
+        let up = store.parentInstance.flatMap { u in store.design.sheetIndex(id: u.sheet).map { store.design.sheets[$0].entityName } }
+        m.addItem(ClosureMenuItem(up.map { "Hierarchy Up (\($0).bdf)" } ?? "Hierarchy Up", enabled: up != nil) {
+            store.hierarchyUp()
+            DispatchQueue.main.async {
+                if let r = store.bounds(of: store.selection) { editor.scroller.reveal(r, zoom: store.zoom) }
+            }
+        })
+        m.addItem(ClosureMenuItem("Update Symbol or Block...", enabled: store.project.components.contains { $0.kind == .block }) {
+            store.sheet = .updateSymbol
+        })
         m.addItem(.separator())
 
         let insert = NSMenuItem(title: "Insert", action: nil, keyEquivalent: "")
@@ -641,7 +659,16 @@ struct SchematicCanvasContent: View {
         guard editor.lastClickCount >= 2 || timed else { return }
         lastTap = nil
         if let c = hit.component(p) {
-            store.sheet = c.kind.isPin ? .pin(c.id) : .symbol(c.id)
+            switch c.kind {
+            case .block:
+                // Quartus opens the block's design file; Symbol Properties stays in the context menu.
+                if !store.openBlock(c.id) {
+                    editor.status = "The project has no file named \(c.symbolName).bdf"
+                    store.sheet = .symbol(c.id)
+                }
+            case .macro: store.sheet = .macroInfo(c.id)
+            default: store.sheet = c.kind.isPin ? .pin(c.id) : .symbol(c.id)
+            }
         } else if let n = hit.note(p) {
             editor.editingNote = n.id
         } else if let st = hit.stub(p) {
@@ -686,12 +713,12 @@ struct SchematicCanvasContent: View {
         default:
             break
         }
-        if case .place(let k) = store.tool, let h = editor.cursor {
+        if case .place(let item) = store.tool, let h = editor.cursor, let prim = item.primitive(in: store.design) {
             var ghost = ctx
-            let s = k.size
+            let s = prim.size
             ghost.translateBy(x: Routing.snap(h.x - s.width / 2), y: Routing.snap(h.y - s.height / 2))
             ghost.opacity = 0.5
-            let parts = GateDrawing.parts(k)
+            let parts = GateDrawing.parts(prim, .none)
             ghost.stroke(parts.stroke, with: .color(accent), lineWidth: lw)
             ghost.stroke(parts.inputLeads, with: .color(accent), lineWidth: lw)
             ghost.stroke(parts.outputLeads, with: .color(accent), lineWidth: lw)

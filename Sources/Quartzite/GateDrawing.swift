@@ -61,9 +61,12 @@ enum GateDrawing {
 struct GateIcon: View {
     var kind: GateKind
     var ink: Color = .primary
+    /// A block's or macro's own geometry (the primitive library otherwise).
+    var primitive: Primitive? = nil
     var body: some View {
         Canvas { ctx, size in
-            let s = kind.size
+            let prim = primitive ?? kind.primitive
+            let s = prim.size
             let crop: CGRect
             switch kind.family {
             case .pinIn: crop = CGRect(x: 76, y: 0, width: 96, height: 16)
@@ -74,7 +77,7 @@ struct GateIcon: View {
             ctx.translateBy(x: (size.width - crop.width * scale) / 2 - crop.minX * scale,
                             y: (size.height - crop.height * scale) / 2 - crop.minY * scale)
             ctx.scaleBy(x: scale, y: scale)
-            let parts = GateDrawing.parts(kind)
+            let parts = GateDrawing.parts(prim, .none)
             let w = 1.3 / max(scale, 0.3)
             ctx.stroke(parts.stroke, with: .color(ink), lineWidth: w)
             ctx.stroke(parts.inputLeads, with: .color(ink), lineWidth: w)

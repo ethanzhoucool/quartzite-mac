@@ -121,9 +121,9 @@ enum CLI {
             #if canImport(SwiftUI)
             if let file = value(after: "--render-project"), let i = args.firstIndex(of: "--render-project"), i + 2 < args.count {
                 let d = try loadDesign(file)
-                guard let p = d.top else { throw DesignProject.LoadError(message: "\(file): no top-level sheet") }
+                guard d.top != nil else { throw DesignProject.LoadError(message: "\(file): no top-level sheet") }
                 let dir = URL(fileURLWithPath: args[i + 2], isDirectory: true)
-                return MainActor.assumeIsolated { SelfTest.renderProject(p, to: dir) } ? 0 : 1
+                return MainActor.assumeIsolated { SelfTest.renderProject(d, to: dir) } ? 0 : 1
             }
             if let file = value(after: "--snapshot-window"), let i = args.firstIndex(of: "--snapshot-window"), i + 2 < args.count {
                 let d = try loadDesign(file)
