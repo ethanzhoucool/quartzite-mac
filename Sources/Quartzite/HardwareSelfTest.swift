@@ -110,10 +110,11 @@ enum HardwareSelfTest {
         defer { try? FileManager.default.removeItem(at: root) }
         let designs = TestDesigns.all
         var lastState: FlowState?
-        for (name, p) in designs {
+        for (name, d) in designs {
             let t0 = Date()
             let cfg = HardwareConfig(toolchain: tc, outputDirectory: root.appendingPathComponent(name, isDirectory: true))
-            let state = CompileFlow.run(p, hardware: cfg)
+            let state = CompileFlow.run(d, hardware: cfg)
+            let p = state.project
             let a = state.assembly
             let n = state.circuit?.inputs.count ?? 0
             check(state.run(.fitter)?.status != .failed && state.pnr != nil,

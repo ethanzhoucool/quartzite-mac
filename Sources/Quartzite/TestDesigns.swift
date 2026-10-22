@@ -164,6 +164,85 @@ enum TestDesigns {
         return db.d
     }
 
+    /// A 7447 at (x, y) with one VCC below its left side wired to LTN, RBIN and BIN (the
+    /// placement of a 7447 drawn in Quartus 18.0), A..D labelled `digit` (LSB first) and OA..OG
+    /// labelled `segments`.
+    @discardableResult
+    static func display(_ b: inout Builder, x: Int, y: Int, digit: [String], segments: [String]) -> Component {
+        let m = b.macro("7447", x: x, y: y)
+        let v = b.vcc(x: x - 96, y: y + 136)
+        for c in ["LTN", "RBIN", "BIN"] { b.wire(b.out(v), b.port(m, c)) }
+        for (k, n) in ["A", "B", "C", "D"].enumerated() { b.label(b.port(m, n), digit[k]) }
+        for (k, n) in ["OA", "OB", "OC", "OD", "OE", "OF", "OG"].enumerated() { b.label(b.port(m, n), segments[k]) }
+        return m
+    }
+
+    /// The 7447's outputs for a digit with LTN, RBIN and BIN high (1 = segment off).
+    static func segments7447(_ n: Int) -> [Int] {
+        MacroLibrary.ttl7447.function((0..<4).map { (n >> $0) & 1 == 1 } + [true, true, true]).prefix(7).map { $0 ? 1 : 0 }
+    }
+
+    /// Minterm text with runs written as ranges ("0-3, 7"); "m()" when there are none.
+    static func mintermText(_ ms: [Int]) -> String {
+        var parts: [String] = []
+        var i = 0
+        while i < ms.count {
+            var j = i
+            while j + 1 < ms.count && ms[j + 1] == ms[j] + 1 { j += 1 }
+            parts.append(j > i ? "\(ms[i])-\(ms[j])" : "\(ms[i])")
+            i = j + 1
+        }
+        return parts.isEmpty ? "m()" : parts.joined(separator: ", ")
+    }
+
+    /// Stores `oracle` (input values by name -> output values by name) as the expected
+    /// minterms of every top-level output, over the top sheet's input order (first = MSB).
+    static func setExpected(_ d: inout DesignProject, _ oracle: ([String: Int]) -> [String: Int]) {
+        guard let t = d.sheetIndex(named: d.topLevelEntity) else { return }
+        let ins = d.sheets[t].inputPins.map(\.name)
+        var on: [String: [Int]] = [:]
+        for r in 0..<(1 << ins.count) {
+            var v: [String: Int] = [:]
+            for (k, n) in ins.enumerated() { v[n] = (r >> (ins.count - 1 - k)) & 1 }
+            for (n, bit) in oracle(v) where bit == 1 { on[n, default: []].append(r) }
+        }
+        for o in d.sheets[t].outputPins { d.sheets[t].expected[o.id.uuidString] = mintermText(on[o.name] ?? []) }
+    }
+
+    static func number(_ v: [String: Int], _ prefix: String) -> Int { (0..<4).reduce(0) { $0 | v["\(prefix)\($1)"]! << $1 } }
+
+    /// One 7447 with every input on a switch (A..D on SW0..SW3, LTN, RBIN, BIN on SW4..SW6)
+    /// and every output on an LED (OA..OG on LEDR0..LEDR6, RBON on LEDR7).
+    static func macro7447Probe() -> DesignProject {
+        var b = Builder("Probe7447")
+        let m = MacroLibrary.ttl7447
+        var ids: [UUID] = []
+        for (k, n) in m.inputs.enumerated() { ids.append(b.input(n, y: 64 + 48 * (6 - k), loc: BoardPin.named("SW\(k)")?.pin).id) }
+        b.p.inputOrder = ids.reversed()
+        let u = b.macro("7447", x: 400, y: 72)
+        for n in m.inputs { b.label(b.port(u, n), n) }
+        let outs = ["seg_a", "seg_b", "seg_c", "seg_d", "seg_e", "seg_f", "seg_g", "rbon"]
+        for (k, o) in outs.enumerated() {
+            b.label(b.port(u, m.outputs[k]), o)
+            b.output(o, x: 640, y: 64 + 32 * k, loc: BoardPin.named("LEDR\(k)")?.pin)
+        }
+        var d = DesignProject(single: b.p)
+        setExpected(&d) { v in Dictionary(uniqueKeysWithValues: zip(outs, m.function(m.inputs.map { v[$0]! == 1 }).map { $0 ? 1 : 0 })) }
+        return d
+    }
+
+    /// d3..d0 on SW3..SW0 through a 7447 to HEX0, with LTN, RBIN and BIN on VCC.
+    static func bcdDisplay() -> DesignProject {
+        var b = Builder("BcdDisplay")
+        b.p.inputOrder = (0..<4).map { k in b.input("d\(3 - k)", x: 40, y: 88 + 48 * k, loc: BoardPin.named("SW\(3 - k)")?.pin).id }
+        let segs = (0..<7).map { "hex0_\($0)" }
+        display(&b, x: 400, y: 72, digit: (0..<4).map { "d\($0)" }, segments: segs)
+        for (k, n) in segs.enumerated() { b.output(n, x: 640, y: 80 + 24 * k, loc: BoardPin.named("HEX0[\(k)]")?.pin) }
+        var d = DesignProject(single: b.p)
+        setExpected(&d) { v in Dictionary(uniqueKeysWithValues: zip(segs, segments7447(number(v, "d")))) }
+        return d
+    }
+
     /// DE10-Standard switches SW3..SW0 for w, x, y, z and LEDR0 for f.
     static let starterLocations = ["w": "PIN_AC30", "x": "PIN_AB28", "y": "PIN_Y27", "z": "PIN_AB30", "f": "PIN_AA24"]
 
@@ -306,19 +385,26 @@ enum TestDesigns {
         return b.p
     }
 
-    static var all: [(String, Project)] {
+    /// The single-sheet designs drawn with primitives only.
+    static var legacy: [(String, Project)] {
         [("example_sop", exampleSOP()), ("example_pos", examplePOS()), ("all_gates", allGates()), ("tricky", tricky()),
          ("rotated", rotated())]
+    }
+
+    static var all: [(String, DesignProject)] {
+        legacy.map { ($0.0, DesignProject(single: $0.1)) } + [
+            ("macro7447_probe", macro7447Probe()), ("bcd_display", bcdDisplay()),
+        ]
     }
 
     // MARK: - Export for CI
 
     /// Writes `<dir>/<design>/` Quartus bundles plus `expected.json` (our simulator's truth table).
-    static func exportSuite(to dir: URL, designs: [(String, Project)] = all) throws {
+    static func exportSuite(to dir: URL, designs: [(String, Project)]) throws {
         try exportSuite(to: dir, designs: designs.map { ($0.0, DesignProject(single: $0.1)) })
     }
 
-    static func exportSuite(to dir: URL, designs: [(String, DesignProject)]) throws {
+    static func exportSuite(to dir: URL, designs: [(String, DesignProject)] = all) throws {
         for (folder, d) in designs {
             let (circuit, msgs, flat) = Compiler.compile(d)
             guard let circuit, let flat, let top = d.top else {
@@ -336,7 +422,7 @@ enum TestDesigns {
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try f.contents.write(to: url, atomically: true, encoding: .utf8)
             }
-            let json: [String: Any] = [
+            var json: [String: Any] = [
                 "entity": top.entityName,
                 "inputs": sim.inputNames,
                 "outputs": sim.outputNames,
@@ -346,6 +432,13 @@ enum TestDesigns {
                     c.location.map { (c.name, $0) } }),
                 "labeled_wires": bundle.notes,
             ]
+            if !flat.identity {
+                // Multi-file bundles: what bdf_check expects to find.
+                json["top"] = d.topLevelEntity
+                json["files"] = flat.sheetsUsed.map { "\($0).bdf" }
+                json["symbols"] = bundle.files.map(\.name).filter { $0.hasSuffix(".bsf") }
+                json["macros"] = flat.macrosUsed
+            }
             let data = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
             try data.write(to: out.appendingPathComponent("expected.json"))
             if d.sheets.count == 1 {

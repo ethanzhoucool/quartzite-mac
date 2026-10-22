@@ -146,11 +146,11 @@ enum CompilerSelfTest {
     /// Verilog text) must reproduce the schematic simulation exactly.
     static func flow(_ check: (Bool, String) -> Void) {
         print("Compile flow on TestDesigns.all")
-        for (name, p) in TestDesigns.all {
-            let state = CompileFlow.run(p)
+        for (name, d) in TestDesigns.all {
+            let state = CompileFlow.run(d)
             check(!state.failed, "\(name): full compilation succeeds (\(state.errors) errors, \(state.warnings) warnings)")
             guard let c = state.circuit, let s = state.synthesis, let text = state.netlist else { continue }
-            guard let sim = try? SimulationResult.run(c, project: p) else { check(false, "Reference design simulation failed"); continue }
+            guard let sim = try? SimulationResult.run(c, project: state.project) else { check(false, "Reference design simulation failed"); continue }
             var memOK = true, textOK = true
             for row in sim.rows {
                 if s.network.evaluate(row.inputs).outputs != row.outputs { memOK = false }

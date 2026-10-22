@@ -41,6 +41,7 @@ enum HierarchySelfTest {
         macros(check)
         flattening(check)
         flow(check)
+        references(check)
     }
 
     /// Truth table rows (outputs as a bit string per row) of a compiled circuit.
@@ -358,7 +359,7 @@ enum HierarchySelfTest {
 
     static func flattening(_ check: Check) {
         print("Flattening")
-        for (name, p) in TestDesigns.all {
+        for (name, p) in TestDesigns.legacy {
             let d = DesignProject(single: p)
             let fast = Flattener.flatten(d).0, full = Flattener.flatten(d, forceFull: true).0
             let a = fast.flatMap { Compiler.elaborateFlat($0).0 }, b = full.flatMap { Compiler.elaborateFlat($0).0 }
@@ -525,6 +526,64 @@ enum HierarchySelfTest {
               "an unused sheet is not exported, and the notes say so")
         let vo = NetlistWriter.bundleFile(d)
         check(vo?.name == "simulation/quartzite/AddSub4_quartzite.vo", "the EDA netlist of a design is named after the top")
+    }
+
+    // MARK: - Reference designs (plan 5.x)
+
+    /// Compiles `d` through the full flow and checks 0 errors, 0 warnings, and that the
+    /// simulation of the flat netlist matches every output's expected minterms.
+    @discardableResult
+    static func reference(_ name: String, _ d: DesignProject, _ check: Check) -> (FlowState, SimulationResult?) {
+        let state = CompileFlow.run(d)
+        check(!state.failed && state.errors == 0 && state.warnings == 0,
+              "\(name): compiles with 0 errors and 0 warnings (\(state.errors), \(state.warnings): \(state.messages.filter { $0.level != .info }.map(\.text).prefix(3)))")
+        guard let c = state.circuit, let sim = try? SimulationResult.run(c, project: state.project) else { return (state, nil) }
+        let bad = sim.outputNames.indices.filter { sim.matches(output: $0) != true }.map { sim.outputNames[$0] }
+        check(bad.isEmpty && !sim.outputNames.isEmpty, "\(name): all \(sim.rows.count) rows match the expected table (wrong: \(bad.prefix(4)))")
+        check((try? QuartusExport.makeBundle(d)) != nil, "\(name): exports without routing warnings")
+        return (state, sim)
+    }
+
+    /// Lit segments for 0-9 as the 7447 draws them, written out independently of Macros.swift.
+    static let glyphs = ["abcdef", "bc", "abdeg", "abcdg", "bcfg", "acdfg", "cdefg", "abc", "abcdefg", "abcfg"]
+
+    /// The digit an active-low seven-segment display shows (nil when it is not a digit).
+    static func decode(_ off: [Bool]) -> Int? {
+        let lit = String(zip("abcdefg", off).filter { !$0.1 }.map(\.0))
+        return glyphs.firstIndex(of: lit)
+    }
+
+    static func references(_ check: Check) {
+        print("Reference designs")
+        let names = TestDesigns.all.map(\.0)
+        check(["macro7447_probe", "bcd_display"].allSatisfy(names.contains), "the 7447 designs are in TestDesigns.all")
+
+        let probe = TestDesigns.macro7447Probe()
+        if let sim = reference("macro7447_probe", probe, check).1 {
+            check(sim.inputNames == ["BIN", "RBIN", "LTN", "D", "C", "B", "A"] && sim.outputNames.count == 8, "the probe reads BIN first and drives 8 LEDs")
+            check(probe.top?.inputPins.map { $0.location } == (0..<7).reversed().map { BoardPin.named("SW\($0)")?.pin },
+                  "the probe's inputs are on SW6..SW0")
+        }
+
+        let bcd = TestDesigns.bcdDisplay()
+        if let sim = reference("bcd_display", bcd, check).1 {
+            check((0..<10).allSatisfy { decode(sim.rows[$0].outputs) == $0 }, "bcd_display shows 0-9 on HEX0")
+            check(bcd.top?.outputPins.map { $0.location } == (0..<7).map { BoardPin.named("HEX0[\($0)]")?.pin }, "bcd_display drives HEX0[0..6]")
+        }
+        if let b = try? QuartusExport.makeBundle(bcd) {
+            let names = b.files.map(\.name)
+            check(names.contains("BcdDisplay.bdf") && !names.contains { $0.hasSuffix(".bsf") }, "a one-sheet design with a macro exports one .bdf and no .bsf")
+            let text = b.files.first { $0.name == "BcdDisplay.bdf" }?.contents ?? ""
+            if let t = fixture("lab2/7447_instance.txt", check) {
+                var i = TestDesigns.Builder("one")
+                let m = i.macro("7447", x: 400, y: 72)
+                i.p.components[0].name = "bcd7seg"
+                _ = m
+                check(String(afterComments(bdf(i.p))).contains(t.replacingOccurrences(of: "\r\n", with: "\n").trimmingCharacters(in: .newlines)),
+                      "a 7447 named bcd7seg at (400, 72) is written as in a .bdf Quartus compiled")
+            }
+            check(text.contains("(text \"7447\" (rect 44 0 77 16)") && text.contains("(text \"VCC\""), "BcdDisplay.bdf has the 7447 and its VCC")
+        }
     }
 
     // MARK: - Sheet operations (plan 1.4)
