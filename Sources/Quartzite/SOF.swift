@@ -345,9 +345,30 @@ enum CycloneVSX120F {
         0xffffffffff, 0xffffffffff, 0xffffffffff, 0xffffffffff, 0x00000030c2, 0x3b030ecc0a, 0x0c50b98814, 0xcf82a014ce,
     ] + Array(repeating: 0xffffffffff, count: 16)
 
+    /// Every part on the sx120f die, as `mistral-cv models` lists them (82 parts), by die prefix.
+    static let parts: Set<String> = {
+        let table = [
+            "5CSEBA5": "U19A7 U19C6 U19C7 U19C7S U19C8 U19C8S U19I7 U19I7L U19I7S U23C7 U23C7S U23C8 U23C8S U23I7L U23I7S",
+            "5CSEBA6": "U19A7 U19C6 U19C7 U19C7S U19C8 U19C8ES U19C8S U19I7 U19I7DK U19I7ES U19I7L U19I7S U23A7 U23C6 U23C7 U23C7S U23C8 U23C8S U23I7 U23I7DK U23I7L U23I7S",
+            "5CSEMA5": "F31A7 F31C6 F31C7 F31C8 F31I7 U23A7 U23C7 U23C8",
+            "5CSEMA6": "F31A7 F31C6 F31C7 F31C8 F31I7 U23A7 U23C6 U23C7 U23C8 U23I7",
+            "5CSTFD5": "D5F31I7",
+            "5CSTFD6": "D5F31I7",
+            "5CSXFC5": "C6U23A7 C6U23C6 C6U23C7 C6U23C8 C6U23I7 C6U23I7L D6F31C6 D6F31C7 D6F31C8 D6F31I7",
+            "5CSXFC6": "C6U23A7 C6U23C6 C6U23C7 C6U23C8 C6U23C8ES C6U23I7 C6U23I7ES C6U23I7L D6F31A7 D6F31C6 D6F31C7 D6F31C8 D6F31C8ES D6F31I7 D6F31I7ES",
+        ]
+        return Set(table.flatMap { die, suffixes in suffixes.split(separator: " ").map { die + $0 } })
+    }()
+
+    /// The part name as Quartus writes it (upper case), or nil if it is not a known sx120f part.
+    static func part(_ device: String) -> String? {
+        let d = device.trimmingCharacters(in: .whitespaces).uppercased()
+        return parts.contains(d) ? d : nil
+    }
+
     /// Low byte of the JTAG IDCODE family field as stored in ORAM bits 6.19..6.26.
     static func idcodeByte(forDevice device: String) -> UInt8? {
-        let d = device.uppercased()
+        guard let d = part(device) else { return nil }
         let p7 = String(d.prefix(7))
         switch p7 {
         case "5CSEBA6", "5CSEMA6", "5CSXFC6", "5CSTFD6": return 0x02
@@ -877,7 +898,7 @@ extension SOFFile {
     init(config cfg: CycloneVConfig, device: String, options o: WrapOptions = WrapOptions()) throws {
         self.init()
         try cfg.validate()
-        guard let idc = CycloneVSX120F.idcodeByte(forDevice: device), idc == cfg.idcode else {
+        guard let dev = CycloneVSX120F.part(device), CycloneVSX120F.idcodeByte(forDevice: dev) == cfg.idcode else {
             throw SOFError.unsupportedDevice(device)
         }
         guard [14, 16, 17].contains(o.layout) else { throw SOFError.invalid("layout must be 14, 16 or 17") }
@@ -889,7 +910,7 @@ extension SOFFile {
 
         if let t = o.template {
             try t.validate()
-            guard t.device?.uppercased() == device.uppercased() else { throw SOFError.invalid("template device does not match the requested device") }
+            guard t.device?.uppercased() == dev else { throw SOFError.invalid("template device does not match the requested device") }
             reserved = t.reserved
             storedCount = t.storedCount
             for r in t.records {
@@ -900,7 +921,7 @@ extension SOFFile {
                     var b = r.body
                     if b.count >= 16 { b.replaceSubrange((b.startIndex + 12)..<(b.startIndex + 16), with: checksumRec.suffix(4)) }
                     records.append(Record(tag: r.tag, body: b))
-                case Tag.device: records.append(Record(tag: r.tag, body: Data(device.utf8) + Data([0])))
+                case Tag.device: records.append(Record(tag: r.tag, body: Data(dev.utf8) + Data([0])))
                 default: records.append(r)
                 }
             }
@@ -913,7 +934,7 @@ extension SOFFile {
         // of the payload. Quartus' own value is opaque (see docs/SOF_FORMAT.md).
         let digest = SOFFile.digest128(cfg.cram + cfg.pram)
         records.append(Record(tag: Tag.compilerVersion, body: str(o.compilerVersion)))
-        records.append(Record(tag: Tag.device, body: str(device)))
+        records.append(Record(tag: Tag.device, body: str(dev)))
         records.append(Record(tag: Tag.designName, body: str(o.designName)))
         if o.layout >= 17 { records.append(Record(tag: Tag.hash, body: Data(digest) + Data([0]))) }
         records.append(Record(tag: Tag.options, body: Data(SOFFile.defaultOptions)))
@@ -928,7 +949,7 @@ extension SOFFile {
                     .replacingOccurrences(of: "'", with: "&apos;")
             }
             let jdi = "<sld_project_info>\r\n  <project>\r\n    <hash md5_digest_80b=\"\(hex)\"/>\r\n  </project>\r\n"
-                + "  <file_info>\r\n    <file device=\"\(device)\" path=\"\(xml(p)).sof\" usercode=\"0xFFFFFFFF\"/>\r\n  </file_info>\r\n</sld_project_info>\r\n"
+                + "  <file_info>\r\n    <file device=\"\(dev)\" path=\"\(xml(p)).sof\" usercode=\"0xFFFFFFFF\"/>\r\n  </file_info>\r\n</sld_project_info>\r\n"
             files.append(EmbeddedFile(timestamp: o.timestamp, flags: 0, reserved: 0, name: "output_files/\(p).jdi", data: Data(jdi.utf8)))
             if o.layout >= 15 {
                 files.append(EmbeddedFile(timestamp: o.timestamp, flags: 0, reserved: 0, name: "output_files/\(p).sld",

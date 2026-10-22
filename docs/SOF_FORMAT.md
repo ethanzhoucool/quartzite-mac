@@ -198,7 +198,7 @@ Inverting section 3 gives the CRAM and PRAM exactly **[verified 16 pairs]**. The
 | record | value written |
 |---|---|
 | 0x0001 | `Quartus Prime Compiler Version 18.1.0 Build 625 09/12/2018 SJ Lite Edition` (`--compiler-version`) |
-| 0x0002 | the device given on the command line; its idcode must match the one in the .rbf |
+| 0x0002 | the device given on the command line, upper-cased. It must be one of the 82 sx120f-die parts in `mistral-cv models` (a bare die prefix such as `5CSXFC6` is refused), and its idcode must match the one in the .rbf |
 | 0x0003 | `Untitled` |
 | 0x003B | a deterministic 128-bit digest of CRAM+PRAM, then 00. This is not Quartus' algorithm, which is unknown. Only with `--layout 17` (the default) |
 | 0x0012 | the common 110-byte value |

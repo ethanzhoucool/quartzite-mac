@@ -49,6 +49,10 @@ enum SOFSelfTest {
         check(edOK, "table EDCRC equals the bit-serial reference")
         check(G.idcodeByte(forDevice: "5CSXFC6D6F31C6") == 0x02 && G.idcodeByte(forDevice: "5CSEMA5F31C6") == 0x12,
               "device idcode table")
+        check(G.parts.count == 82 && G.parts.contains("5CSEBA6U23I7") && G.part(" 5csxfc6d6f31c6 ") == "5CSXFC6D6F31C6",
+              "82 sx120f parts (mistral-cv models); names are matched without regard to case")
+        check(["5CSXFC6-NOT-A-PART", "5CSXFC6", "5CSXFC6D6F31C6X", "5CSEMA4U23C6", ""].allSatisfy { G.idcodeByte(forDevice: $0) == nil },
+              "devices are checked against the part list, not their first 7 characters")
         // Sparse synthetic configuration: a few CRAM bits (including MLAB columns) and PRAM bits.
         var cram = [UInt8](repeating: 0, count: G.cramSX * G.cramSY / 8)
         for (x, y) in [(1, 32), (630, 100), (640, 5000), (7604, 7023), (4050, 3646), (3000, 222)] {
@@ -111,6 +115,17 @@ enum SOFSelfTest {
             } else { check(false, "malformed payload remains inspectable") }
             check((try? SOFFile(config: cfg, device: "5CSEBA6U23I7", options: .init(template: sof))) == nil,
                   "template for a different package/device is rejected")
+            check((try? SOFFile(config: cfg, device: "5CSXFC6-NOT-A-PART")) == nil, "an unknown part name is refused")
+            if let lower = try? SOFFile(config: cfg, device: "5csxfc6d6f31c6", options: .init(projectName: "p")),
+               let jdi = lower.embeddedFiles?.first(where: { $0.name.hasSuffix(".jdi") }) {
+                check(lower.device == "5CSXFC6D6F31C6" && String(decoding: jdi.data, as: UTF8.self).contains("device=\"5CSXFC6D6F31C6\""),
+                      "a lower-case device is written as the upper-case part name")
+            } else { check(false, "lower-case device wraps") }
+            broken = sof
+            let di = broken.records.firstIndex { $0.tag == SOFFile.Tag.device }!
+            broken.records[di].body = Data("5CSXFC6\0".utf8)
+            broken.updateCRC()
+            check((try? broken.extractRBF()) == nil, "a .sof whose device record is only a die prefix is not converted")
             for size in [0, 0x15, 109] {
                 broken = sof
                 let oi = broken.records.firstIndex { $0.tag == SOFFile.Tag.options }!
