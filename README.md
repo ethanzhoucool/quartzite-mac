@@ -167,10 +167,15 @@ File › Export Quartus Project… writes a folder with:
 | `Waveform.vwf` | Test vectors counting through every input combination |
 | `<project>_pins.qsf` | Pin locations and I/O standards only, for Assignments › Import Assignments |
 | `<project>_backup.v` | The same circuit as structural Verilog, as a fallback |
+| `simulation/quartzite/<entity>_quartzite.vo` | The synthesized LUT netlist, with its own LUT model so any Verilog simulator runs it |
 | `README_LAB.txt` | Step-by-step for the lab computer |
 
 Files that nothing under the top-level entity uses are left out, and the export's
 message lists them.
+
+The export, like Run Functional Simulation, needs a design with at most 10 input pins,
+because `Waveform.vwf` and the simulation step through every input combination.
+Compilation accepts up to 16.
 
 ## Compiler
 
