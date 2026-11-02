@@ -252,32 +252,93 @@ enum Minimizer {
         return chosen
     }
 
+    /// A set of prime indices as a bitset, with its size.
+    private struct PrimeSet: Equatable {
+        var words: [UInt64]
+        var count: Int
+
+        init(_ elements: [Int], words n: Int) {
+            words = [UInt64](repeating: 0, count: n)
+            for e in elements { words[e >> 6] |= 1 << UInt64(e & 63) }
+            count = words.reduce(0) { $0 + $1.nonzeroBitCount }
+        }
+
+        func isSubset(of b: PrimeSet) -> Bool {
+            for i in words.indices where words[i] & ~b.words[i] != 0 { return false }
+            return true
+        }
+
+        func isDisjoint(with b: PrimeSet) -> Bool {
+            for i in words.indices where words[i] & b.words[i] != 0 { return false }
+            return true
+        }
+
+        func inserting(_ e: Int) -> PrimeSet {
+            var s = self
+            s.words[e >> 6] |= 1 << UInt64(e & 63)
+            s.count += 1
+            return s
+        }
+
+        var elements: [Int] {
+            var out: [Int] = []
+            for (w, word) in words.enumerated() {
+                var x = word
+                while x != 0 { out.append(w * 64 + x.trailingZeroBitCount); x &= x - 1 }
+            }
+            return out
+        }
+
+        /// Smaller sets first; sets of one size by their sorted elements, lexicographically.
+        /// (The set holding the lowest element of the symmetric difference comes first.)
+        static func precedes(_ a: PrimeSet, _ b: PrimeSet) -> Bool {
+            if a.count != b.count { return a.count < b.count }
+            for i in a.words.indices {
+                let x = a.words[i] ^ b.words[i]
+                if x != 0 { return a.words[i] & (x & (~x &+ 1)) != 0 }
+            }
+            return false
+        }
+
+        /// Sorted by `precedes` without duplicates, keeping only the sets that contain no
+        /// earlier set; nil once more than `limit` are kept. A set can only contain a smaller
+        /// one, and `kept` is in size order, so each scan stops at the set's own size.
+        static func minimal(_ sets: [PrimeSet], limit: Int = .max) -> [PrimeSet]? {
+            var kept: [PrimeSet] = []
+            for s in sets.sorted(by: precedes) where kept.last != s {
+                var absorbed = false
+                for k in kept {
+                    if k.count >= s.count { break }
+                    if k.isSubset(of: s) { absorbed = true; break }
+                }
+                if absorbed { continue }
+                kept.append(s)
+                if kept.count > limit { return nil }
+            }
+            return kept
+        }
+    }
+
     /// Petrick's method: multiply out the product of sums (one sum per uncovered minterm),
     /// absorbing superset products as we go. Returns nil if it grows too large.
     static func petrick(_ clausesIn: [[Int]], literals: [Int], limit: Int = petrickLimit) -> Set<Int>? {
+        let words = (clausesIn.lazy.flatMap { $0 }.max() ?? 0) / 64 + 1
         // Drop duplicate clauses and clauses implied by smaller ones (a ⊆ b means b is redundant).
-        var clauses = Array(Set(clausesIn.map { Set($0) }))
-        clauses.sort { $0.count != $1.count ? $0.count < $1.count : $0.sorted().lexicographicallyPrecedes($1.sorted()) }
-        var reduced: [Set<Int>] = []
-        for c in clauses where !reduced.contains(where: { $0.isSubset(of: c) }) { reduced.append(c) }
+        let reduced = PrimeSet.minimal(clausesIn.map { PrimeSet($0, words: words) })!
 
-        var products: [Set<Int>] = [[]]
+        var products = [PrimeSet([], words: words)]
         for clause in reduced {
-            var next: [Set<Int>] = []
+            let options = clause.elements
+            var next: [PrimeSet] = []
             for p in products {
                 if !p.isDisjoint(with: clause) { next.append(p); continue }
-                for c in clause.sorted() { next.append(p.union([c])) }
+                for c in options { next.append(p.inserting(c)) }
             }
-            next = Array(Set(next)).sorted { $0.count != $1.count ? $0.count < $1.count : $0.sorted().lexicographicallyPrecedes($1.sorted()) }
-            var kept: [Set<Int>] = []
-            for p in next where !kept.contains(where: { $0.isSubset(of: p) }) {
-                kept.append(p)
-                if kept.count > limit { return nil }
-            }
+            guard let kept = PrimeSet.minimal(next, limit: limit) else { return nil }
             products = kept
         }
-        func cost(_ s: Set<Int>) -> (Int, Int) { (s.count, s.reduce(0) { $0 + literals[$1] }) }
-        var best: Set<Int>?
+        func cost(_ s: PrimeSet) -> (Int, Int) { (s.count, s.elements.reduce(0) { $0 + literals[$1] }) }
+        var best: PrimeSet?
         for p in products {
             if let b = best {
                 let cp = cost(p), cb = cost(b)
@@ -285,7 +346,7 @@ enum Minimizer {
             }
             best = p
         }
-        return best
+        return best.map { Set($0.elements) }
     }
 }
 
