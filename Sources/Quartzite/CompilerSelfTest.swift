@@ -67,6 +67,15 @@ enum CompilerSelfTest {
         let cyclic = TruthTable(n: 3, minterms: [0, 1, 2, 5, 6, 7])
         let rc = Minimizer.minimize(on: cyclic)
         check(rc.cubes.count == 3 && rc.essentialCount == 0 && rc.method.contains("Petrick"), "cyclic cover solved by Petrick's method (3 terms)")
+        // Prime indices past 64 and 128 (several bitset words): fewest primes, then fewest
+        // literals, then the first set in sorted order.
+        var lits = [Int](repeating: 2, count: 140)
+        let ring = [[3, 70], [70, 130], [3, 130]]
+        check(Minimizer.petrick(ring, literals: lits) == [3, 70], "Petrick's method breaks ties by the sorted prime indices")
+        lits[3] = 3
+        check(Minimizer.petrick(ring, literals: lits) == [70, 130], "Petrick's method prefers fewer literals among equal-size covers")
+        check(Minimizer.petrick(ring + [[5]], literals: lits) == [5, 70, 130], "Petrick's method keeps a single-prime clause")
+        check(Minimizer.petrick((0..<12).map { [2 * $0, 2 * $0 + 1] }, literals: lits, limit: 100) == nil, "Petrick's method gives up past its product limit")
         check(Minimizer.minimize(on: TruthTable(n: 3)).cubes.isEmpty && Equation.sop([], names: names) == "GND", "constant 0 is GND")
         check(Equation.sop(Minimizer.minimize(on: .constant(true, n: 3)).cubes, names: names) == "VCC", "constant 1 is VCC")
 
