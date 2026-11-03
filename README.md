@@ -271,6 +271,9 @@ runs from Terminal:
 - `Quartzite --export-suite <dir>` exports the reference designs.
   `python3 ci/bdf_check.py <dir>/*` then re-reads each `.bdf` independently and simulates it against Quartzite's
   truth table.
+- `python3 ci/random_designs.py <path to Quartzite>` builds seeded random designs (200 by
+  default), exports each one, checks it with `ci/bdf_check.py` and by simulating the
+  written Verilog, then imports it back.
 - `python3 -m unittest discover -s ci` runs the Python checks.
 - GitHub Actions run all of the above on macOS and Linux. `ci/quartus_check.py` compiles
   the exports with real Quartus Lite when installer links are provided.

@@ -7,22 +7,31 @@ on:
   push:
     branches: [main]
 
+# A new push to a pull request cancels its older runs; runs on main are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   macos:
     runs-on: macos-14
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Build and test the native editor
         env: { QUARTZITE_REQUIRE_FIXTURES: '1' }
+        # The release build that build_app.sh makes. The self-test took about 6.5 minutes
+        # in a debug build.
         run: |
-          swift build
-          .build/debug/Quartzite --selftest
+          swift build -c release
+          .build/release/Quartzite --selftest
       - name: Check the real-Quartus validation harness
         run: python3 -m unittest discover -s ci -p 'test_*.py'
 
   export:
     runs-on: ubuntu-22.04
     container: swift:5.10-jammy
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Build the command-line exporter
@@ -58,6 +67,8 @@ jobs:
               bad += bool(diff)
           sys.exit(1 if bad else 0)
           PY
+      - name: Random designs through export, the independent checks and import
+        run: python3 ci/random_designs.py .build/release/Quartzite --count 200 --seed 1
       - uses: actions/upload-artifact@v4
         with: { name: suite, path: suite }
 
