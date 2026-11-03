@@ -102,7 +102,14 @@ struct Routing {
         }
         for w in fallback {
             guard let net = conn.netOf[w.a], conn.netOf[w.b] != nil else { continue }
-            let name = conn.netName(net, project: project)
+            // Both ends must carry the same name. An end that already has a stub (a user net
+            // label) keeps it, so the other end takes that name; two different names would
+            // leave the ends unconnected in Quartus.
+            let named = [w.a, w.b].compactMap { ref in stubs.first { $0.port == ref }?.name }
+            if named.count == 2 && named[0].caseInsensitiveCompare(named[1]) != .orderedSame {
+                warnings.append("The wire between nodes '\(named[0])' and '\(named[1])' can't be drawn without touching another wire, and Quartus does not connect two different names; use one name for this net")
+            }
+            let name = named.first ?? conn.netName(net, project: project)
             addStub(w.a, name: name)
             addStub(w.b, name: name)
         }

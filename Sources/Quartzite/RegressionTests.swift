@@ -14,6 +14,7 @@ enum RegressionTests {
         testEntityNamesAndPinWhitespaceAreValidForExport()
         testGeneratedNetNamesAvoidInstancesAndOtherNets()
         testRoutingPreservesBacktrackingForReversalCheck()
+        testFallbackWireKeepsOneName()
         testInputLimitAndUnsafeRoutes()
         testInvalidExpectedIsNotAMatch()
         testMalformedAssignmentsAreRejected()
@@ -89,6 +90,43 @@ enum RegressionTests {
     static func testRoutingPreservesBacktrackingForReversalCheck() {
         let path = [CGPoint(x: 0, y: 0), CGPoint(x: 16, y: 0), CGPoint(x: 8, y: 0), CGPoint(x: 8, y: 8)]
         assertTrue(Routing.reversesOnItself(Routing.dedupe(path)))
+    }
+
+    /// A wire that can't be drawn is exported as two stubs with one name. When one end already
+    /// had a net label, the other end used to get the net's pin name instead, so the exported
+    /// .bdf left the output pin undriven.
+    static func testFallbackWireKeepsOneName() {
+        var b = TestDesigns.Builder("Stubs")
+        b.input("a", y: 64)
+        b.input("b", y: 128)
+        let g = b.gate(.or2, x: 240, y: 48)               // OUT at (304, 72)
+        b.label(b.pin(g, 0), "a"); b.label(b.pin(g, 1), "b")
+        b.label(b.out(g), "n")
+        b.vcc(x: 304, y: 56)                              // its port at (320, 72) blocks every route out of g
+        let k = b.gate(.not, x: 352, y: 192)              // its port at (400, 208) blocks the last one
+        b.label(b.pin(k, 0), "b")
+        let f = b.output("f", x: 480, y: 200)
+        b.wire(g, to: f, 0)
+        let routing = Routing(project: b.p, conn: Connectivity(b.p))
+        assertEqual(routing.labeledWires.count, 1, "Fallback fixture: the wire to f can't be drawn")
+        let names = routing.stubs.filter { $0.port == b.out(g) || $0.port == b.pin(f, 0) }.map(\.name)
+        assertEqual(names, ["n", "n"], "Both ends of a wire exported as labels carry the existing label's name")
+        assertTrue(routing.warnings.isEmpty, "A fallback wire with one labelled end is not a routing problem")
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("quartzite-stubs-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let d = DesignProject(single: b.p)
+        if let qpf = try? ImportSelfTest.export(d, to: tmp), let imported = ImportSelfTest.importFile(qpf).0?.design {
+            assertTrue(ImportSelfTest.table(d) != nil && ImportSelfTest.table(imported) == ImportSelfTest.table(d),
+                       "The exported .bdf still drives f (import round trip has the same truth table)")
+        } else {
+            check(false, "The exported .bdf still drives f (export and import succeed)")
+        }
+
+        // Two different names on the two ends can't be expressed with stubs: refuse the export.
+        b.label(b.pin(f, 0), "m")
+        let both = Routing(project: b.p, conn: Connectivity(b.p))
+        assertTrue(both.warnings.contains { $0.contains("'n'") && $0.contains("'m'") }, "Fallback wire between two different labels is a routing warning")
+        assertThrows(try QuartusExport.makeBundle(b.p, conn: Connectivity(b.p)), "Export refuses a fallback wire whose ends have different labels")
     }
 
     static func check(_ condition: Bool, _ message: String) {
