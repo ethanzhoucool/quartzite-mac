@@ -67,6 +67,8 @@ jobs:
               bad += bool(diff)
           sys.exit(1 if bad else 0)
           PY
+      - name: Random designs through export, the independent checks and import
+        run: python3 ci/random_designs.py .build/release/Quartzite --count 200 --seed 1
       - uses: actions/upload-artifact@v4
         with: { name: suite, path: suite }
 
