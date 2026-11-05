@@ -70,14 +70,14 @@ enum CLI {
     /// `--sof-verify <file.qzproj> <file.sof> [--work <dir>]`: decodes a .sof from another tool
     /// (Quartus) with mistral-cv and checks its pins and truth table against the schematic.
     static func verifyForeignSOF(project: String, sof: String, work: String?) throws -> Int32 {
-        let p = try JSONDecoder().decode(Project.self, from: Data(contentsOf: URL(fileURLWithPath: project)))
+        let d = try loadDesign(project)
         let search = Toolchain.locate()
         guard let tc = search.toolchain else { throw HardwareFlow.Failure(message: "the check needs mistral-cv. \(search.summary)") }
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("quartzite-sof-verify-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: tmp) }
         var c = HardwareConfig(toolchain: tc, outputDirectory: tmp)
         c.workDirectory = work.map { URL(fileURLWithPath: $0, isDirectory: true) } ?? tmp
-        let check = try HardwareFlow.verifyForeignSOF(project: p, sof: URL(fileURLWithPath: sof), config: c)
+        let check = try HardwareFlow.verifyForeignSOF(design: d, sof: URL(fileURLWithPath: sof), config: c)
         for pin in check.pins {
             print("\(pin.ok ? "Info" : "Error"): \(pin.isInput ? "input" : "output") \"\(pin.name)\" at PIN_\(pin.pin): \(pin.note)" + (pin.isInput || !pin.ok ? "" : pin.drive.map { " (\($0))" } ?? ""))
         }
