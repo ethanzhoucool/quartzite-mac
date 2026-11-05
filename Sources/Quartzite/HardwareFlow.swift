@@ -363,8 +363,8 @@ enum HardwareFlow {
     /// with the Assembler's decoder and checks. Quartus folds unrouted LUT inputs into its masks as
     /// 1, so they are assumed to read 1 (QZ_FLOAT_INPUT overrides), and each output's drive strength
     /// must match its board pin's I/O standard, as the exported .qsf sets it.
-    static func verifyForeignSOF(project p: Project, sof url: URL, config: HardwareConfig) throws -> BitstreamCheck {
-        let state = CompileFlow.run(p, stages: [.analysisSynthesis, .fitter])
+    static func verifyForeignSOF(design d: DesignProject, sof url: URL, config: HardwareConfig) throws -> BitstreamCheck {
+        let state = CompileFlow.run(d, stages: [.analysisSynthesis, .fitter])
         guard !state.failed, let circuit = state.circuit, let fit = state.fit else {
             throw Failure(message: "the schematic does not compile" + (state.messages.first { $0.level == .error }.map { ": \($0.text)" } ?? ""))
         }
@@ -374,10 +374,10 @@ enum HardwareFlow {
         }
         let sof = try SOFFile(contentsOf: url)
         try sof.validate()
-        guard let dev = CycloneVSX120F.part(sof.device ?? ""), dev == CycloneVSX120F.part(p.device) else {
-            throw Failure(message: "the .sof is for \(sof.device ?? "an unknown device"), the project for \(p.device)")
+        guard let dev = CycloneVSX120F.part(sof.device ?? ""), dev == CycloneVSX120F.part(d.device) else {
+            throw Failure(message: "the .sof is for \(sof.device ?? "an unknown device"), the project for \(d.device)")
         }
-        let work = config.workDir(p.entityName)
+        let work = config.workDir(d.topLevelEntity)
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
         let base = url.deletingPathExtension().lastPathComponent
         let rbfURL = work.appendingPathComponent("\(base)_from_sof.rbf")

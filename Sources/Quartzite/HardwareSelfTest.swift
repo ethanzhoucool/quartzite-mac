@@ -161,6 +161,13 @@ enum HardwareSelfTest {
             check(report.contains { $0.find("stage.fitter.pnr.placement") != nil } && report.contains { $0.find("stage.assembler.check") != nil },
                   "report has the nextpnr placement and the Assembler's bitstream check")
         }
+        print("Checking a .sof against a multi-sheet .qzproj")
+        if let a = lastState?.assembly, let d = lastState?.design, d.sheets.count > 1 {
+            let file = root.appendingPathComponent("multi-sheet.qzproj")
+            try? d.encoded().write(to: file)
+            let code = try? CLI.verifyForeignSOF(project: file.path, sof: a.sofURL.path, work: nil)
+            check(code == 0, "--sof-verify reads a multi-sheet .qzproj and checks a .sof against it")
+        } else { check(false, "the last hardware test design has several sheets") }
         #if canImport(SwiftUI)
         print("App compilation with the open-source Fitter and Assembler")
         MainActor.assumeIsolated { storeWithToolchain(check, root: root) }
@@ -280,6 +287,16 @@ enum HardwareSelfTest {
         check(stray.map { !$0.passed && $0.strayDrivenPins == ["AG16"] } == true, "an output driver on a pin outside the design is caught")
         let reg = mutated { $0.replacingOccurrences(of: "TDFF1.0 NLUT", with: "TDFF1.0 FF") }
         check(reg.map { !$0.passed && $0.evaluationError?.contains("register") == true } == true, "a register output is refused (not modelled)")
+        // Quartus can make an output the NOT of a net with the pin's DATAOUT inverter.
+        let invertedOut = { (s: String) in s + "\ni GPIO.089.011.0:DATAOUT.0 1 ; AA24" }
+        let complement = Set(0..<16).subtracting([2, 3, 6, 7, 9, 13, 14])
+        check(mutated(demoSpec(complement), invertedOut).map { $0.passed && $0.rowsMatching == 16 } == true,
+              "an inverter on an output's DATAOUT complements that output (16/16 rows)")
+        check(mutated(demoSpec(), invertedOut).map { !$0.passed && $0.rowsMatching == 0 } == true,
+              "a DATAOUT inverter the schematic does not have is caught (0/16 rows)")
+        let cleared = mutated { $0 + "\ni GPIO.089.011.0:DATAOUT.0 0 ; AA24" }
+        check(cleared.map { !$0.passed && $0.evaluationError?.contains("not modelled") == true } == true,
+              "an inverter value other than 1 on a data path is refused (not modelled)")
         check(HardwareFlow.parseConstrain("Info: Constraining IO 'z_MISTRAL_IB_PAD' to pin PIN_AB30 (bel MISTRAL_IO.89.21.0)").map { $0.pin == "PIN_AB30" && $0.bel == "MISTRAL_IO.89.21.0" } == true,
               "parses nextpnr's IO constraint lines")
         check(HardwareFlow.parseUtilLine("Info: \t        MISTRAL_COMB:       3/  83820     0%").map { $0.0 == "MISTRAL_COMB" && $0.1 == 3 && $0.2 == 83820 } == true,

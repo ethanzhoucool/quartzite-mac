@@ -325,7 +325,7 @@ enum BitstreamVerifier {
 
     /// The routed LUT netlist rebuilt from the decoded routes, compiled once and evaluated per row.
     final class Netlist {
-        enum Ref { case input(Int), half(Int) }
+        indirect enum Ref { case input(Int), half(Int), inverted(Ref) }
         struct Half {
             var info: BitstreamCheck.ALMHalf
             var mask: UInt64
@@ -374,9 +374,19 @@ enum BitstreamVerifier {
                 chain.append(src)
                 cur = src
             }
-            for n in chain where bt.inversions[n] != nil {
-                throw EvalError(message: "routing node \(n) has a non-default inversion; not modelled")
+            // Quartus can drive an output that is the NOT of a net with the pin's own DATAOUT
+            // inverter instead of a LUT, so an inverter on the path flips the value.
+            var flipped = false
+            for n in chain {
+                guard let inv = bt.inversions[n] else { continue }
+                guard inv.value == "1" else { throw EvalError(message: "routing node \(n) has inversion value \(inv.value); not modelled") }
+                flipped.toggle()
             }
+            let driver = try driver(of: cur, node: node, depth: depth)
+            return flipped ? .inverted(driver) : driver
+        }
+
+        private func driver(of cur: String, node: String, depth: Int) throws -> Ref {
             if let k = inputs[cur] { return .input(k) }
             // (LAB|MLAB).xxx.yyy.alm:PIN
             guard let colon = cur.lastIndex(of: ":") else { throw EvalError(message: "net \(node) is driven by unsupported source \(cur)") }
@@ -443,6 +453,7 @@ enum BitstreamVerifier {
             switch ref {
             case .input(let k): return env[k]
             case .half(let i): return try halfValue(i, env)
+            case .inverted(let r): return try !value(r, env)
             }
         }
 
